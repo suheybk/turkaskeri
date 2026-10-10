@@ -2,6 +2,17 @@ name = "turk-askeri"
 main = "src/worker.js"
 compatibility_date = "2025-10-01"
 
+# Alt alan adı: zone (shanidargame.com) Cloudflare hesabında olduğu için
+# wrangler `ta` DNS kaydını kendisi açıyor.
+# DİKKAT: bu iki anahtar üst seviyede ve TÜM tablo başlıklarından ÖNCE durmalı.
+# [[migrations]]'dan sonraya yazılınca TOML onları migrations'ın alanı sayıyor.
+routes = [
+  { pattern = "ta.shanidargame.com", custom_domain = true },
+]
+# `routes` tanımlanınca wrangler workers.dev adresini kapatıyor; yedek adres
+# olarak açık kalsın ki alan adında sorun çıkarsa oyun yine açılsın.
+workers_dev = true
+
 [assets]
 directory = "./public"
 binding = "ASSETS"
@@ -18,8 +29,3 @@ class_name = "Accounts"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Room", "Accounts"]
-
-# Yayına alırken (zone Cloudflare'de ise) alt alan adını otomatik bağlar:
-# [[routes]]
-# pattern = "ta.shanidargame.com"
-# custom_domain = true

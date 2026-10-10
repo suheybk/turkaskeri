@@ -100,6 +100,14 @@ export class Accounts {
     const path = new URL(req.url).pathname;
     const body = req.method === 'GET' ? {} : await req.json().catch(() => ({}));
     if (path === '/register') {
+      /* Girişte deneme kilidi vardı, KAYITTA hiçbir sınır yoktu: tek bir
+         istemci binlerce hesap açıp Durable Object deposunu şişirebiliyordu.
+         Cloudflare gerçek istemci adresini `cf-connecting-ip` ile veriyor ve
+         Worker başlıkları DO'ya aynen aktarıyor. */
+      const ip = req.headers.get('cf-connecting-ip') || 'bilinmeyen';
+      const rl = (await this.s.get('r:' + ip)) || { n: 0, t: 0 };
+      if (Date.now() - rl.t > 3600e3) { rl.n = 0; rl.t = Date.now(); }
+      if (rl.n >= 5) return J({ ok: false, err: 'Bu adresten çok fazla hesap açıldı. Bir saat sonra tekrar dene.' }, 429);
       const name = cleanName(body.u), pw = String(body.p || '');
       if (name.length < 3) return J({ ok: false, err: 'Kullanıcı adı en az 3 harf olsun.' }, 400);
       if (pw.length < 4) return J({ ok: false, err: 'Şifre en az 4 karakter olsun.' }, 400);
@@ -108,6 +116,7 @@ export class Accounts {
       const salt = randHex(16);
       const prof = body.prof ? cleanProf(body.prof) : null;
       await this.s.put('u:' + ukey, { name, salt, hash: await hashPw(pw, salt), prof, created: Date.now() });
+      rl.n++; await this.s.put('r:' + ip, rl);          // sayaç yalnızca başarılı kayıtta artar
       return J({ ok: true, name, token: await this.newToken(ukey), prof });
     }
     if (path === '/login') {
@@ -148,6 +157,9 @@ const num = (v, d = 0) => (Number.isFinite(+v) ? +v : d);
 export class Room {
   constructor() {
     this.inited = false; this.pw = ''; this.players = new Map(); this.nextId = 1;
+    /* `/info` istenen şifrenin doğru olup olmadığını (`pwOk`) söylüyordu ve
+       hiçbir sınır yoktu — oda şifresi sınırsız denenebiliyordu. */
+    this.pwFail = { n: 0, until: 0 };
     this.phase = 'lobby'; this.score = { a: 0, o: 0 }; this.left = MATCH; this.host = null; this.timer = null;
   }
   async fetch(req) {
@@ -160,6 +172,15 @@ export class Room {
     }
     if (!this.inited) return J({ exists: false }, 404);
     const pwGiven = u.searchParams.get('pw') || '';
+    /* Yanlış şifre sayılır; BOŞ şifre sayılmaz, çünkü istemci `needsPw`i
+       öğrenmek için önce boş sorguyla geliyor. */
+    if (this.pw && pwGiven) {
+      if (this.pwFail.until > Date.now())
+        return J({ err: 'cok_deneme', retry: Math.ceil((this.pwFail.until - Date.now()) / 1000) }, 429);
+      if (pwGiven !== this.pw) {
+        if (++this.pwFail.n >= 10) { this.pwFail.n = 0; this.pwFail.until = Date.now() + 60e3; }
+      } else this.pwFail.n = 0;
+    }
     if (u.pathname === '/info') {
       return J({ exists: true, needsPw: !!this.pw, pwOk: !this.pw || pwGiven === this.pw, count: this.players.size, max: MAXP, full: this.players.size >= MAXP, phase: this.phase });
     }
@@ -183,7 +204,7 @@ export class Room {
   addPlayer(ws, name) {
     const cnt = { a: 0, o: 0 }; for (const p of this.players.values()) cnt[p.team]++;
     const team = cnt.a <= cnt.o ? 'a' : 'o';
-    const p = { id: this.nextId++, name, ws, team, kills: 0, deaths: 0, alive: true, hp: TEAMHP[team], lastHit: 0, x: 0, z: 0 };
+    const p = { id: this.nextId++, name, ws, team, kills: 0, deaths: 0, alive: true, hp: TEAMHP[team], lastHit: 0, x: 0, z: 0, sn: 0, mc: 0 };
     this.players.set(p.id, p);
     if (!this.host || !this.players.has(this.host)) this.host = p.id;
     if (this.phase === 'play') { p.alive = true; p.hp = TEAMHP[team]; }
@@ -226,6 +247,14 @@ export class Room {
   }
   onMsg(p, data) {
     if (typeof data !== 'string' || data.length > 2000) return;
+    /* Hiz siniri: her paket odadaki herkese role ediliyor, yani tek istemci
+       7 kat yayin carpani olarak kullanilabiliyordu. En hizli mesaj akisi
+       konum guncellemesi (`st`); 120/sn fazlasiyla yeterli.
+       NOT: bu bir hile onlemi DEGIL, DoS onlemi. Isabetin dogrulanmamasi
+       (istemci `hit.d` bildiriyor) ayri bir konu, README'de yazili. */
+    const sn = (Date.now() / 1000) | 0;
+    if (sn !== p.sn) { p.sn = sn; p.mc = 0; }
+    if (++p.mc > 120) return;
     let m; try { m = JSON.parse(data); } catch (e) { return; }
     switch (m.t) {
       case 'team': {

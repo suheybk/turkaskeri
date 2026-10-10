@@ -1,0 +1,18 @@
+# Cloudflare statik dosya basliklari.
+#
+# CSP notu: oyunun tamami tek satir ici <script> oldugu icin script-src
+# 'unsafe-inline' istiyor. Yine de degerli: enjekte edilmis bir
+# <script src="kotu.com"> yuklenemiyor, object/base/form/frame kapali.
+# Satir ici blok public/game.js'e tasinirsa 'unsafe-inline' dusurulebilir
+# (dosyada hic satir ici on* niteligi ve eval yok, yani tek engel bu blok).
+#
+# three.js cdnjs'ten, yazi tipleri Google Fonts'tan geliyor; ikisine de
+# acikca izin verildi. connect-src'de wss: ayni origin'deki /ws hatti icin.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' wss:; worker-src 'self' blob:; media-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  X-Frame-Options: DENY
+  Cross-Origin-Opener-Policy: same-origin
+  Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=(), usb=(), interest-cohort=()
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
