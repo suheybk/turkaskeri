@@ -1,0 +1,6 @@
+{
+  "name": "turk-askeri",
+  "private": true,
+  "scripts": { "dev": "wrangler dev --local", "deploy": "wrangler deploy" },
+  "devDependencies": { "wrangler": "^4" }
+}
