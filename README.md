@@ -72,3 +72,9 @@ pakette ölümcül hasar gönderebilir.
 Bunu kapatmak sunucu-otoriter isabet testi gerektiriyor (silah tablosu +
 harita geometrisi + ışın testi sunucuda). Ayrı bir iş; WebSocket hız sınırı
 yalnızca DoS'u kesiyor, hileyi kesmiyor.
+
+## Botlar, kurucu ayarları ve oylama
+- Oda: en çok 8 insan oyuncu. İki mod: takım savaşı (4'e 4) ve Battle Royale (en çok 16 kişi, bot dahil).
+- Botlar her modda var. Botları kurucunun tarayıcısı yönetir (kurucu çıkarsa yeni kurucu devralır); can ve ölüm kararlarını sunucu verir.
+- Kurucu lobide modu seçer, bot ekler/çıkarır, oyuncu ve botların takımını değiştirir. "Oyunu başlat"a basınca diğer oyunculara teklif gider, 5 saniye içinde oy verirler (oy vermeyen kabul sayılır). Ret sayısı kabulden az değilse teklif düşer; yalnız oyuncu varsa oylama yapılmaz.
+- Battle Royale: dünya, eşyalar ve çember odanın tohumundan türetilir (herkeste aynı). Eşya alma ve araca binme sunucuda hakemlenir.
