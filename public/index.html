@@ -1220,8 +1220,8 @@ function updatePlayer(dt){
     let nx=P.x+P.vx*dt; if(blockedAt(nx,P.z,R,P.y)) P.vx=0; else P.x=nx;
     let nz=P.z+P.vz*dt; if(blockedAt(P.x,nz,R,P.y)) P.vz=0; else P.z=nz;
     if(blockedAt(P.x,P.z,0.3,P.y)){ let done=false; for(let d=1;d<=10&&!done;d+=1){ for(let a=0;a<12;a++){ const tx=P.x+Math.cos(a*0.5236)*d, tz=P.z+Math.sin(a*0.5236)*d; if(!blockedAt(tx,tz,0.42,P.y)){ P.x=tx; P.z=tz; done=true; break; } } } }
-    P.vy-=18*dt; P.y+=P.vy*dt;
-    const g=groundAt(P.x,P.z,R,P.y);
+    const py0=P.y; P.vy-=18*dt; P.y+=P.vy*dt;
+    const g=groundAt(P.x,P.z,R,Math.max(py0,P.y));
     if(P.y<=g){ P.y=g; P.vy=0; if(keys.Space) P.vy=6.8; }
     P.sprint=sprint;
   }
@@ -1388,7 +1388,7 @@ function buildBRWorld(){
     wallZ(cz+d/2,dS); wallZ(cz-d/2,dN);
     add(cx-w/2,cz,t,d-t,h,'bld'); add(cx+w/2,cz,t,d-t,h,'bld');
     add(cx,cz,w+0.8,d+0.8,0.3,'roof',h); add(cx,cz,w-0.2,d-0.2,0.05,'floor',0,true);
-    BR.houses.push({cx,cz,w,d}); BR.doors.push({x:cx+dS,z:cz+d/2+2.2}); if(dN!=null)BR.doors.push({x:cx+dN,z:cz-d/2-2.2});
+    BR.houses.push({cx,cz,w,d,h}); BR.doors.push({x:cx+dS,z:cz+d/2+2.2}); if(dN!=null)BR.doors.push({x:cx+dN,z:cz-d/2-2.2});
     const nl=2+Math.floor(R()*3);
     for(let i=0;i<nl;i++) BR.spots.push({x:cx+rr(-w/2+1.2,w/2-1.2),z:cz+rr(-d/2+1.2,d/2-1.2)});
     if(R()<0.6){ const sx=R()<0.5?-1:1; add(cx+sx*(w/2-1.1),cz-d/2+1.1,1.2,1.2,1.0,'crate'); }
@@ -1415,6 +1415,20 @@ function buildBRWorld(){
   for(let i=0;i<22;i++){ const x=rr(-135,135),z=rr(-135,135); const rect={x0:x-3,x1:x+3,z0:z-3,z1:z+3}; if(reserved.some(r=>ovl(r,rect)))continue; reserved.push(rect); add(x,z,1.6,1.6,1.1,'crate'); if(R()<0.4)BR.spots.push({x:x+2.2,z:z}); }
   // çevre duvarı
   add(0,-H-0.5,2*H+4,1,7,'wall'); add(0,H+0.5,2*H+4,1,7,'wall'); add(-H-0.5,0,1,2*H+4,7,'wall'); add(H+0.5,0,1,2*H+4,7,'wall');
+  // çatılara çıkan dış merdivenler (sniper noktaları): basamak 0.28 m (0.3 altı: otomatik çıkılır)
+  BR.stairs=[];
+  BR.houses.forEach((hs,hi)=>{
+    if(hi%2)return;
+    const SH=0.28, n=Math.ceil(hs.h/SH), span=Math.min(n*0.5,hs.d-0.4), tread=span/n, sw=1.8;
+    for(const side of [1,-1]){
+      const sx=hs.cx+side*(hs.w/2+0.5+sw/2), z0=hs.cz-hs.d/2+0.2; // duvarın hemen dışı (çatı çıkıntısının ötesi)
+      const fx0=sx-sw/2-0.3,fx1=sx+sw/2+0.3,fz0=z0-0.8,fz1=z0+span+0.3;
+      if(Math.abs(sx)>H-4)continue;
+      if(boxes.some(b=>b.miny<1&&b.minx<fx1&&b.maxx>fx0&&b.minz<fz1&&b.maxz>fz0))continue;
+      for(let k=0;k<n;k++) add(sx,z0+tread*(k+0.5),sw,tread,(k+1)*SH,'low');
+      BR.stairs.push({x:sx,z:z0-0.6,dirz:1,top:n*SH,house:hi}); break;
+    }
+  });
   // birleştirilmiş statik ağlar
   for(const k in merged){ const kk=KINDS[k]; const m=new THREE.Mesh(mergeGeos(merged[k]),new THREE.MeshStandardMaterial({map:kk[0],roughness:kk[2],metalness:kk[3]})); m.castShadow=(k!=='floor'); m.receiveShadow=true; grp.add(m); }
   // zemin
@@ -2468,7 +2482,7 @@ function frame(t){
   renderer.render(scene,camera);
 }
 buildViewmodels('a'); refreshMenuLevel();
-window.__TA={get MP(){return MP;},mpMsg,get mode(){return mode;},addXP,get prof(){return prof;},WEAP,DBG,fighters,get P(){return P;},scene,camera,BR};
+window.__TA={ground:(x,z,r,y)=>groundAt(x,z,r,y),blocked:(x,z,r,y)=>blockedAt(x,z,r,y),BOXES,get MP(){return MP;},mpMsg,get mode(){return mode;},addXP,get prof(){return prof;},WEAP,DBG,fighters,get P(){return P;},scene,camera,BR};
 requestAnimationFrame(frame);
 })();
 </script>
