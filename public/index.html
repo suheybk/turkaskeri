@@ -184,6 +184,13 @@ body.touch.playing #touch{display:block}
 .tb.big{width:calc(var(--b)*1.45);height:calc(var(--b)*1.45);font-size:clamp(14px,3.8vh,19px);border-color:rgba(229,72,58,.8);background:rgba(229,72,58,.28)}
 .tb.big.on{background:rgba(229,72,58,.7)}
 .tb.sm{width:calc(var(--b)*.78);height:calc(var(--b)*.78);font-size:clamp(9px,2.5vh,12px)}
+.sonly{display:none}
+body.spec .sonly{display:flex}
+#tsp1{right:calc(14px + var(--sar));top:30%}
+#tsp2{right:calc(90px + var(--sar));top:30%}
+#tsp3{right:calc(166px + var(--sar));top:30%}
+#specbar{position:absolute;left:0;right:0;bottom:8%;font-size:17px;color:rgba(236,232,216,.8)}
+#specname{font-size:26px!important;color:var(--bone)!important}
 #tfire{right:calc(14px + var(--sar));bottom:calc(14px + var(--sab))}
 #tads{right:calc(26px + var(--b)*1.45 + var(--sar));bottom:calc(14px + var(--b)*.55 + var(--sab))}
 #tjump{right:calc(14px + var(--b)*.2 + var(--sar));bottom:calc(26px + var(--b)*1.45 + var(--sab))}
@@ -215,6 +222,7 @@ body.touch .keys,body.touch .soon{display:none}
 body.touch.inveh .wonly{display:none}
 body.touch.inair .wonly{display:none}
 body.touch.invair #tdown,body.touch.inair #tdown{display:flex}
+body.touch.invair #tfire{display:flex}
 body.touch.useok #tuse{display:flex}
 #rotate{position:fixed;inset:0;z-index:50;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#0f1210;font-size:26px;font-weight:700;text-align:center;padding:30px}
 #rotate b{font-size:64px;display:block;animation:rot 1.8s ease-in-out infinite}
@@ -280,7 +288,7 @@ body.touch.useok #tuse{display:flex}
   <div id="cross"><i></i><i></i><i></i><i></i></div>
   <div id="hitm"></div>
   <div id="hurt"></div>
-  <div id="dead"><b class="stencil">Elendin</b><span id="deadsub"></span></div>
+  <div id="dead"><b class="stencil">Elendin</b><span id="deadsub"></span><div id="specbar" style="display:none"><span id="specname"></span><br><span id="spechelp">Tık / ← →: oyuncu değiştir &nbsp;|&nbsp; C: kamera (3. kişi / 1. kişi)</span></div></div>
   <div id="lvl"><b class="stencil" id="lvlb"></b><span id="lvls"></span></div>
   <div id="xpg"></div>
   <div id="scope"></div>
@@ -389,6 +397,7 @@ body.touch.useok #tuse{display:flex}
 <div id="touch">
   <div id="tbase"></div><div id="tstick"><i></i></div>
   <div class="tb big wonly" id="tfire">ATEŞ</div>
+  <div class="tb sonly" id="tsp1">İleri ›</div><div class="tb sonly" id="tsp2">‹ Geri</div><div class="tb sonly" id="tsp3">Kamera</div>
   <div class="tb wonly" id="tads">NİŞAN</div>
   <div class="tb" id="tjump">ZIPLA</div>
   <div class="tb" id="tdown">ALÇAL</div>
@@ -1091,6 +1100,23 @@ function playerShoot(){
   sndShot(n>1?0.42:0.32,w.pitch); P.firedT=1.2;
   if(ammo[cur]<=0) startReload();
 }
+function vehShoot(){
+  const v=P.veh; fireCd=1/11;
+  camera.updateMatrixWorld();
+  const d0=new THREE.Vector3(); camera.getWorldDirection(d0);
+  const fw=new THREE.Vector3(-Math.sin(v.yaw),0,-Math.cos(v.yaw));
+  const side=(vehGunSide=-vehGunSide)*1.1, rx=Math.cos(v.yaw)*side, rz=-Math.sin(v.yaw)*side;
+  const ox=v.x+fw.x*3+rx, oy=v.y+0.9, oz=v.z+fw.z*3+rz;
+  const d=d0.clone(); d.x+=rnd(-0.012,0.012); d.y+=rnd(-0.012,0.012); d.z+=rnd(-0.012,0.012); d.normalize();
+  const r=trace(ox,oy,oz,d.x,d.y,d.z,260,P.side);
+  const ex=ox+d.x*r.t,ey=oy+d.y*r.t,ez=oz+d.z*r.t;
+  tracer(ox,oy,oz,ex,ey,ez);
+  if(MP.play) mpSend({t:'sh',ax:+ox.toFixed(2),ay:+oy.toFixed(2),az:+oz.toFixed(2),bx:+ex.toFixed(2),by:+ey.toFixed(2),bz:+ez.toFixed(2),w:LOADOUT[cur].id});
+  if(r.f){ burst(ex,ey,ez,0x9b1f18,4,2.6); damage(r.f,22*(r.head?1.5:1),P,r.head); }
+  else if(r.t<260) burst(ex,ey,ez,0xb9b7aa,3,2.2);
+  sndShot(0.3,0.7); P.firedT=1.2;
+}
+let vehGunSide=1;
 let flashT=0,vmKick=0,adsK=0,bobT=0;
 
 /* ---------- Botlar ---------- */
@@ -1244,6 +1270,7 @@ function updatePlayer(dt){
     if(ammo[cur]>0){ playerShoot(); if(!w.auto)mouseDown=false; }
     else startReload();
   }
+  if(P.alive&&state==='play'&&P.veh&&(P.veh.type==='heli'||P.veh.type==='plane')){ if(mouseDown&&fireCd<=0)vehShoot(); }
   // hasar rejenerasyonu
   if(P.alive){ if(!MP.play){ if(regenT>0)regenT-=dt; else if(P.hp<P.maxHp)P.hp=Math.min(P.maxHp,P.hp+18*dt); } }
   else if((mode==='tdm'||(mode==='br'&&BR.dm))&&!MP.play){ P.respT-=dt; $('deadsub').textContent=($('deadsub').textContent.split(' | ')[0])+' | '+Math.max(0,Math.ceil(P.respT))+' sn'; if(P.respT<=0&&state==='play'){ respawn(P); $('dead').style.display='none'; } }
@@ -1272,11 +1299,18 @@ function updatePlayer(dt){
   $('cross').style.setProperty('--g',gap.toFixed(1)+'px');
 }
 
+function specList(){ return fighters.filter(f=>f!==P&&f.alive); }
+function specStep(d){
+  const l=specList(); if(!l.length)return; let i=l.indexOf(MP.specT); i=i<0?0:(i+d+l.length)%l.length; MP.specT=l[i];
+}
 function specCam(){
-  let t=MP.specT; if(!t||!t.alive||t===P){ t=null; for(const f of fighters){ if(f!==P&&f.alive){ t=f; break; } } MP.specT=t; }
+  let t=MP.specT; if(!t||!t.alive||t===P){ t=specList()[0]||null; MP.specT=t; }
+  const sn=$('specname'); if(sn){ const nm=t?'İzlenen: '+t.name+(t.bot?' (bot)':''):'Kimse kalmadı'; if(sn.textContent!==nm)sn.textContent=nm; }
   if(!t)return; const yy=t.yaw||0;
+  if(MP.specFp){ camera.position.set(t.x,t.y+1.65,t.z); camera.rotation.set(t.pitch||0,yy,0,'YXZ'); return; }
   camera.position.set(t.x+Math.sin(yy)*4.2,Math.max(0.6,t.y+2.6),t.z+Math.cos(yy)*4.2); camera.lookAt(t.x,t.y+1.4,t.z);
 }
+function specOn(){ return state==='play'&&P&&!P.alive&&MP.play&&mode==='br'&&!BR.dm; }
 /* ---------- HUD ---------- */
 let hudCache={};
 function setT(id,v){ if(hudCache[id]!==v){ hudCache[id]=v; $(id).textContent=v; } }
@@ -1690,7 +1724,7 @@ const VCFG={car:{acc:17,brake:38,max:31,rev:9,turn:1.75,r:1.5,h:1.8,wr:0.42},bik
 const VCAM={car:{d:7.5,h:1.6,look:0.4},bike:{d:5.5,h:1.4,look:0.5},heli:{d:15,h:2.5,look:1},plane:{d:15,h:2.4,look:1}};
 const VDIM={car:[1.0,2.1,1.9],bike:[0.45,1.1,1.2],heli:[1.5,3.4,3.2],plane:[4.6,3.8,2.6]};
 const VHELP={car:'W/S gaz-fren, A/D direksiyon, Boşluk el freni, E ile in',bike:'W/S gaz-fren, A/D direksiyon, Boşluk fren, E ile in',
-  heli:'W/S ileri-geri, A/D dön, Boşluk yüksel, Shift alçal. Yerdeyken E ile in, havadayken E ile paraşütle atla',plane:'W/S gaz, A/D dön, Boşluk burun yukarı, Shift burun aşağı. Hız 24 üstünde havalanır. Yerdeyken E ile in, havadayken E ile paraşütle atla'};
+  heli:'W/S ileri-geri, A/D dön, Boşluk yüksel, Shift alçal. Sol tık: ateş. Yerdeyken E ile in, havadayken E ile paraşütle atla',plane:'W/S gaz, A/D dön, Boşluk burun yukarı, Shift burun aşağı. Sol tık: ateş. Hız 24 üstünde havalanır. Yerdeyken E ile in, havadayken E ile paraşütle atla'};
 function buildVehicleMesh(type){
   const bx=(w,h,d,x,y,z,col,rx,ry,rz)=>bake(new THREE.BoxGeometry(w,h,d),x,y,z,rx||0,ry||0,rz||0,1,1,1,col);
   const cy=(rt,rb,h,x,y,z,rx,ry,rz,col,sg)=>bake(new THREE.CylinderGeometry(rt,rb,h,sg||12,1),x,y,z,rx||0,ry||0,rz||0,1,1,1,col);
@@ -2097,6 +2131,7 @@ window.addEventListener('keydown',e=>{
   if(e.code==='Tab'){ e.preventDefault(); if(state==='play'){ fillScoreboard(); $('score').style.display='flex'; } return; }
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
   keys[e.code]=true;
+  if(specOn()){ if(e.code==='ArrowRight')specStep(1); else if(e.code==='ArrowLeft')specStep(-1); else if(e.code==='KeyC')MP.specFp=!MP.specFp; }
   if(state!=='play'||!P)return;
   if(e.code==='KeyP'&&fallback){ paused=!paused; $('pause').classList.toggle('on',paused); }
   if(paused)return;
@@ -2126,6 +2161,7 @@ window.addEventListener('mousemove',e=>{
 });
 window.addEventListener('mousedown',e=>{
   if(state!=='play'||paused)return;
+  if(specOn()){ if(e.button===0)specStep(1); else if(e.button===2)specStep(-1); return; }
   if(e.button===0)mouseDown=true; if(e.button===2)mouseR=true;
 });
 window.addEventListener('mouseup',e=>{ if(e.button===0)mouseDown=false; if(e.button===2)mouseR=false; });
@@ -2183,6 +2219,12 @@ if(IS_TOUCH){
   }
   function tap(id,fn){ const el=$(id); el.addEventListener('pointerdown',e=>{ e.preventDefault(); e.stopPropagation(); el.classList.add('on'); setTimeout(()=>el.classList.remove('on'),130); if(state==='play'&&P&&!paused)fn(); }); }
   hold('tfire',()=>{ mouseDown=true; },()=>{ mouseDown=false; });
+  { const el=$('tfire'); let fid=null,fx=0,fy=0;
+    el.addEventListener('pointerdown',e=>{ if(fid===null){ fid=e.pointerId; fx=e.clientX; fy=e.clientY; } });
+    el.addEventListener('pointermove',e=>{ if(e.pointerId!==fid||state!=='play'||paused||!P)return; e.preventDefault();
+      const dx=clamp(e.clientX-fx,-80,80), dy=clamp(e.clientY-fy,-80,80); fx=e.clientX; fy=e.clientY;
+      const sc=0.0048*Math.max(0.25,camera.fov/75); P.yaw-=dx*sc; P.pitch=clamp(P.pitch-dy*sc,-1.45,1.45); if(P.veh)lastMouse=now; });
+    const fe=e=>{ if(e.pointerId===fid)fid=null; }; el.addEventListener('pointerup',fe); el.addEventListener('pointercancel',fe); el.addEventListener('lostpointercapture',fe); }
   hold('tjump',()=>{ keys.Space=true; },()=>{ keys.Space=false; });
   hold('tdown',()=>{ keys.ShiftLeft=true; },()=>{ keys.ShiftLeft=false; });
   { const el=$('tads'); el.addEventListener('pointerdown',e=>{ e.preventDefault(); e.stopPropagation(); if(state!=='play'||paused)return; mouseR=!mouseR; el.classList.toggle('on',mouseR); }); }
@@ -2192,6 +2234,7 @@ if(IS_TOUCH){
   tap('tsmoke',()=>throwNade('smoke'));
   tap('tknife',()=>stab());
   tap('tuse',()=>interact());
+  for(const [id,fn] of [['tsp1',()=>specStep(1)],['tsp2',()=>specStep(-1)],['tsp3',()=>{MP.specFp=!MP.specFp;}]]){ const el=$(id); el.addEventListener('pointerdown',e=>{ e.preventDefault(); e.stopPropagation(); if(specOn())fn(); }); }
   $('tpause').addEventListener('pointerdown',e=>{ e.preventDefault(); e.stopPropagation(); if(state!=='play')return; paused=true; mouseDown=false; mouseR=false; $('tads').classList.remove('on'); $('pause').classList.add('on'); stickEnd(); });
   { const el=$('ttab'); const show=e=>{ e.preventDefault(); e.stopPropagation(); if(state==='play'){ fillScoreboard(); $('score').style.display='flex'; } };
     const hide=()=>{ $('score').style.display='none'; };
@@ -2200,6 +2243,7 @@ if(IS_TOUCH){
   setInterval(()=>{
     const b=document.body.classList, pl=state==='play'&&P;
     const veh=pl&&P.veh, air=pl&&P.air&&!P.veh;
+    b.toggle('spec',specOn()); { const sb=$('specbar'); if(sb)sb.style.display=specOn()?'block':'none'; }
     b.toggle('inveh',!!veh); b.toggle('inair',!!air);
     b.toggle('invair',!!(veh&&(veh.type==='heli'||veh.type==='plane')));
     b.toggle('useok',!!(pl&&mode==='br'&&!air&&P.alive&&($('prompt').style.display==='block'||veh)));
