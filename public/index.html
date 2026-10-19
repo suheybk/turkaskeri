@@ -367,6 +367,7 @@ body.touch.useok #tuse{display:flex}
     <button class="team o" data-team="o"><b class="stencil">Özel Harekât</b><span>Çevik ve hafif. 90 can, biraz daha hızlı.</span></button>
   </div>
   <button class="brbtn" id="brbtn"><b class="stencil">Battle Royale</b><span>Paraşütle atla, silah topla, araca bin. Daralan çemberde son hayatta kalan kazanır. 16 oyuncu.</span></button>
+  <button class="brbtn" id="dmbtn"><b class="stencil">Ölüm Maçı</b><span>Battle Royale haritasında herkes herkese. Ölünce yeniden doğarsın. İlk 40 öldürmeyi yapan kazanır. 16 oyuncu.</span></button>
   <button class="lnk" id="mpbtn" style="margin-top:14px">Çok oyunculu: oyun koduyla katıl</button>
   <div class="keys">
     <div><b>W A S D</b> hareket</div><div><b>Fare</b> nişan, <b>sol tık</b> ateş</div>
@@ -1061,6 +1062,7 @@ function kill(t,a,head){
   if(t.isPlayer){ $('dead').style.display='flex'; $('deadsub').textContent=a.name+' seni vurdu'; }
   if(a.isPlayer) addXP(head?30:20);
   if(mode==='tdm'){ updateScoreHud(); if(score[a.team]>=TARGET_KILLS) endMatch(); }
+  else if(BR.dm){ if(a.kills>=40) endDM(); }
   else brOnKill(t,a);
 }
 
@@ -1160,7 +1162,7 @@ function updateBot(b,dt){
   if(DBG.freeze){ b.mesh.position.set(b.x,b.y,b.z); b.mesh.rotation.y=b.yaw; animFig(b.fig,DBG.phase||0,DBG.amp||0); return; }
   if(!b.alive){
     b.respT-=dt; if(b.deadK<1){ b.deadK=Math.min(1,b.deadK+dt*3); b.mesh.rotation.x=b.deadK*1.5; }
-    if(b.respT<=0&&state==='play'&&mode==='tdm'&&!MP.play) respawn(b);
+    if(b.respT<=0&&state==='play'&&(mode==='tdm'||(mode==='br'&&BR.dm))&&!MP.play) respawn(b);
     return;
   }
   if(b.air){ updateAirBot(b,dt); return; }
@@ -1244,7 +1246,7 @@ function updatePlayer(dt){
   }
   // hasar rejenerasyonu
   if(P.alive){ if(!MP.play){ if(regenT>0)regenT-=dt; else if(P.hp<P.maxHp)P.hp=Math.min(P.maxHp,P.hp+18*dt); } }
-  else if(mode==='tdm'&&!MP.play){ P.respT-=dt; $('deadsub').textContent=($('deadsub').textContent.split(' | ')[0])+' | '+Math.max(0,Math.ceil(P.respT))+' sn'; if(P.respT<=0&&state==='play'){ respawn(P); $('dead').style.display='none'; } }
+  else if((mode==='tdm'||(mode==='br'&&BR.dm))&&!MP.play){ P.respT-=dt; $('deadsub').textContent=($('deadsub').textContent.split(' | ')[0])+' | '+Math.max(0,Math.ceil(P.respT))+' sn'; if(P.respT<=0&&state==='play'){ respawn(P); $('dead').style.display='none'; } }
   // ADS ve kamera
   const wantAds=(mouseR&&P.alive&&!P.sprint&&reloadT<=0)?1:0; adsK+=(wantAds-adsK)*(1-Math.exp(-14*dt));
   const fov=75-(75-(w.adsFov||52))*adsK; if(Math.abs(camera.fov-fov)>0.05){ camera.fov=fov; camera.updateProjectionMatrix(); }
@@ -1554,6 +1556,42 @@ function endBR(won){
   if(document.exitPointerLock) document.exitPointerLock();
   mouseDown=false; mouseR=false; $('score').style.display='none';
   if(BR.zoneMesh)BR.zoneMesh.visible=false;
+}
+function endDM(){
+  if(state!=='play')return; state='end';
+  let lead=P; for(const f of fighters) if(f.kills>lead.kills)lead=f;
+  const won=lead===P;
+  $('endt').textContent=won?'Kazandın!':'Kazanan: '+lead.name; $('endt').style.color=won?'var(--oh)':'var(--bone)';
+  $('ends').textContent='Senin skorun: '+P.kills+' öldürme, '+P.deaths+' ölüm   |   Lider: '+lead.name+' '+lead.kills;
+  addXP(won?250:Math.min(150,40+P.kills*4));
+  let ex='Kazanılan XP: '+gained+'. Seviyen: '+prof.level+'.'; if(sessionUnlocks.length)ex+=' Yeni silah: '+sessionUnlocks.map(x=>x.name).join(', ')+'. Teçhizat ekranından alabilirsin.';
+  $('endx').textContent=ex; $('scope').style.display='none'; $('lvl').style.opacity=0; $('dead').style.display='none';
+  $('end').classList.add('on'); document.body.classList.remove('playing');
+  if(document.exitPointerLock)document.exitPointerLock(); mouseDown=false; mouseR=false; $('score').style.display='none';
+}
+function startDM(){
+  initAudio(); clearBots();
+  if(!BR.built){ buildBRWorld(); setWorld('br'); buildNav(BR.half); createVehicles(); } else setWorld('br');
+  mode='br'; BR.dm=true; BR.over=false; BR.endT=0; BR.place=0; BR.ts=1; BR.total=16; brRand=Math.random; zoneRand=Math.random;
+  applyLoadout(); gained=0; sessionUnlocks=[]; lvlQ=[]; lvlBusy=false; $('lvl').style.opacity=0; hudCache={};
+  zoneInit(); { const Z=BR.zone; Z.r=Z.tr=215; Z.cx=Z.cz=Z.tcx=Z.tcz=0; } BR.zoneMesh.visible=false;
+  BR.items=[]; if(BR.itemGrp)while(BR.itemGrp.children.length)BR.itemGrp.remove(BR.itemGrp.children[0]);
+  resetVehicles(); for(const v of BR.vehicles){ v.mesh.visible=false; v.occupied=true; syncVehBox(v); }
+  timeLeft=600; score.a=score.o=0;
+  P=makeFighter('Sen','a',true,false); P.side='Sen'; P.css='#ece8d8'; P.vx=P.vz=P.vy=0; P.veh=null; P.air=false; P.sprint=false; fighters.push(P);
+  P.style={camo:'woodland',vest:0x4a5a3a,helm:0x3f4a36,skin:0xc79b78,bal:false,pack:0x3b4030,col:0x888888};
+  const names=BRNAMES.slice().sort(()=>Math.random()-0.5), kinds=['woodland','desert','urban','black','blue'];
+  for(let i=0;i<15;i++){
+    const st={camo:kinds[Math.floor(Math.random()*5)],vest:[0x4a5a3a,0x5a4a32,0x3a3d40,0x2e2f2e][i%4],helm:[0x3f4a36,0x6b5a3c,0x2d3033,0x1c1d1d][i%4],skin:SKINS[i%5],bal:Math.random()<0.2,pack:Math.random()<0.65?[0x3b4030,0x5a4a32,0x2d3033][i%3]:0,col:0x888888};
+    const f=makeFighter(names[i],'a',false,false,st,randomWeapon()); f.side=names[i]; f.css=hslHex(i/15); fighters.push(f);
+  }
+  buildViewmodels('a'); resetAmmo();
+  for(const f of fighters) respawn(f);
+  $('feed').innerHTML=''; $('dead').style.display='none'; $('hint').style.display='none'; $('prompt').style.display='none'; $('vinfo').style.display='none';
+  $('goal').textContent='İlk 40 öldürmeyi yapan kazanır'; $('sa').textContent='Sen 0'; $('so').textContent='Lider 0 / 40';
+  state='play'; paused=false; fallback=false; document.body.classList.remove('nolock'); document.body.classList.add('playing'); P.pitch=0;
+  $('menu').classList.remove('on'); $('end').classList.remove('on'); $('pause').classList.remove('on'); $('gear').classList.remove('on');
+  lockPointer();
 }
 function startBR(){
   BR.dm=false; initAudio(); clearBots();
@@ -2014,7 +2052,7 @@ function startGame(teamKey){
   lockPointer();
 }
 function endMatch(){
-  if(state!=='play')return; state='end';
+  if(state!=='play')return; if(mode==='br'&&BR.dm){ endDM(); return; } state='end';
   const w=score.a===score.o?null:(score.a>score.o?'a':'o');
   $('endt').textContent=w?(TEAM[w].name+' kazandı'):'Berabere';
   $('endt').style.color=w?TEAM[w].css:'var(--bone)';
@@ -2051,6 +2089,7 @@ $('pause').addEventListener('click',()=>{ if(state==='play'){ if(fallback||IS_TO
 document.querySelectorAll('.team').forEach(b=>b.addEventListener('click',()=>startGame(b.dataset.team)));
 $('again').addEventListener('click',()=>{ $('end').classList.remove('on'); if(MP.ws){ showLobby(); return; } $('again').textContent='Menüye dön'; $('menu').classList.add('on'); state='menu'; setWorld('tdm'); if(BR.zoneMesh)BR.zoneMesh.visible=false; refreshMenuLevel(); });
 $('brbtn').addEventListener('click',startBR);
+$('dmbtn').addEventListener('click',startDM);
 
 /* ---------- Girdi ---------- */
 window.addEventListener('keydown',e=>{
@@ -2174,7 +2213,7 @@ if(IS_TOUCH){
   // tam ekran + yatay kilit (izin verilirse)
   window.__goFull=()=>{ try{ const de=document.documentElement; const f=de.requestFullscreen||de.webkitRequestFullscreen; if(f&&!document.fullscreenElement&&!document.webkitFullscreenElement){ const r=f.call(de); if(r&&r.catch)r.catch(()=>{}); } }catch(_){}
     try{ if(screen.orientation&&screen.orientation.lock){ const r=screen.orientation.lock('landscape'); if(r&&r.catch)r.catch(()=>{}); } }catch(_){} };
-  document.querySelectorAll('.team,#brbtn').forEach(b=>b.addEventListener('click',()=>window.__goFull()));
+  document.querySelectorAll('.team,#brbtn,#dmbtn').forEach(b=>b.addEventListener('click',()=>window.__goFull()));
 }
 
 /* ---------- Çok oyunculu ---------- */

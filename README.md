@@ -77,5 +77,5 @@ yalnızca DoS'u kesiyor, hileyi kesmiyor.
 - Oda: en çok 8 insan oyuncu. İki mod: takım savaşı (4'e 4) ve Battle Royale (en çok 16 kişi, bot dahil).
 - Botlar her modda var. Botları kurucunun tarayıcısı yönetir (kurucu çıkarsa yeni kurucu devralır); can ve ölüm kararlarını sunucu verir.
 - Kurucu lobide modu seçer, bot ekler/çıkarır, oyuncu ve botların takımını değiştirir. "Oyunu başlat"a basınca diğer oyunculara teklif gider, 5 saniye içinde oy verirler (oy vermeyen kabul sayılır). Ret sayısı kabulden az değilse teklif düşer; yalnız oyuncu varsa oylama yapılmaz.
-- Ölüm maçı (Battle Royale haritasında herkes herkese): ölenler 3 sn sonra rastgele bir noktada yeniden doğar, ilk 40 öldürmeyi yapan kazanır (10 dakikada kimse ulaşamazsa en çok öldüren). Eşya, araç ve çember yok; oyuncunun kendi teçhizatı kullanılır.
+- Ölüm maçı (tek kişilik de var: ana menüden botlarla) (Battle Royale haritasında herkes herkese): ölenler 3 sn sonra rastgele bir noktada yeniden doğar, ilk 40 öldürmeyi yapan kazanır (10 dakikada kimse ulaşamazsa en çok öldüren). Eşya, araç ve çember yok; oyuncunun kendi teçhizatı kullanılır.
 - Battle Royale: dünya, eşyalar ve çember odanın tohumundan türetilir (herkeste aynı). Eşya alma ve araca binme sunucuda hakemlenir.
