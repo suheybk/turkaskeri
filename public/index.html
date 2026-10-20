@@ -287,7 +287,7 @@ body.touch.useok #tuse{display:flex}
     <div id="wslots"><span>1</span><span>2</span><span>3</span></div><div id="equip"></div></div>
   <div id="cross"><i></i><i></i><i></i><i></i></div>
   <div id="hitm"></div>
-  <div id="hurt"></div>
+  <div id="hurt"></div><div id="uw" style="display:none;position:absolute;inset:0;background:rgba(14,66,108,.62);pointer-events:none"></div>
   <div id="dead"><b class="stencil">Elendin</b><span id="deadsub"></span><div id="specbar" style="display:none"><span id="specname"></span><br><span id="spechelp">Tık / ← →: oyuncu değiştir &nbsp;|&nbsp; C: kamera (3. kişi / 1. kişi)</span></div></div>
   <div id="lvl"><b class="stencil" id="lvlb"></b><span id="lvls"></span></div>
   <div id="xpg"></div>
@@ -792,12 +792,13 @@ const tracers=[], parts=[];
 })();
 let trI=0,paI=0;
 const _a=new THREE.Vector3(),_b=new THREE.Vector3();
-function inWater(x,z){
-  const W=BR.waters; if(!W||!BR.built)return false;
-  for(const r of W.rivers){ if(Math.abs(x-r.x)<r.hw){ let br=false; for(const bz of W.bridges){ if(Math.abs(z-bz)<W.bw){ br=true; break; } } if(!br)return true; } }
-  for(const l of W.lakes){ if(Math.hypot(x-l.x,z-l.z)<l.r)return true; }
-  return false;
+function waterDepth(x,z){
+  const W=BR.waters; if(!W||!BR.built||mode!=='br')return 0;
+  for(const r of W.rivers){ const dx=Math.abs(x-r.x); if(dx<r.hw){ let br=false; for(const bz of W.bridges){ if(Math.abs(z-bz)<W.bw){ br=true; break; } } if(!br)return 2.4*Math.min(1,(1-dx/r.hw)*2.2); } }
+  for(const l of W.lakes){ const d=Math.hypot(x-l.x,z-l.z); if(d<l.r)return l.deep*Math.min(1,(1-d/l.r)*1.9); }
+  return 0;
 }
+function inWater(x,z){ return waterDepth(x,z)>0; }
 function tracer(ax,ay,az,bx,by,bz){
   const t=tracers[trI++%tracers.length]; _a.set(ax,ay,az); _b.set(bx,by,bz);
   const len=_a.distanceTo(_b); if(len<0.3)return;
@@ -1151,7 +1152,7 @@ function vehShoot(){
   P.firedT=1.2;
 }
 let vehGunSide=1;
-let flashT=0,vmKick=0,adsK=0,bobT=0;
+let flashT=0,vmKick=0,adsK=0,bobT=0,underW=false;
 
 /* ---------- Botlar ---------- */
 function pickGoal(b){
@@ -1284,7 +1285,7 @@ function updatePlayer(dt){
     const sprint=keys.ShiftLeft&&keys.KeyW&&!mouseR&&reloadT<=0;
     let ix=(keys.KeyD?1:0)-(keys.KeyA?1:0), iz=(keys.KeyW?1:0)-(keys.KeyS?1:0);
     const il=Math.hypot(ix,iz)||1; ix/=il; iz/=il;
-    const sp=(sprint?7.2:4.8)*(adsK>0.5?0.62:1)*T.spd*((mode==='br'&&P.y<0.3&&inWater(P.x,P.z))?0.45:1);
+    const sp=(sprint?7.2:4.8)*(adsK>0.5?0.62:1)*T.spd*(mode==='br'?(()=>{ const wd=waterDepth(P.x,P.z); return wd>0?0.62-0.34*Math.min(1,wd/2.2):1; })():1);
     const fx=-Math.sin(P.yaw),fz=-Math.cos(P.yaw),rx=Math.cos(P.yaw),rz=-Math.sin(P.yaw);
     const tvx=(fx*iz+rx*ix)*sp, tvz=(fz*iz+rz*ix)*sp, k=1-Math.exp(-(P.y>0.05?3:13)*dt);
     P.vx+=(tvx-P.vx)*k; P.vz+=(tvz-P.vz)*k;
@@ -1295,13 +1296,14 @@ function updatePlayer(dt){
     const py0=P.y; P.vy-=18*dt; P.y+=P.vy*dt;
     const g=groundAt(P.x,P.z,R,Math.max(py0,P.y));
     if(P.y<=g){ P.y=g; P.vy=0; if(keys.Space) P.vy=6.8; }
+    if(mode==='br'&&P.y<=g+0.02&&g<0.05){ const wd=waterDepth(P.x,P.z); if(wd>0){ P.y=g-Math.min(wd,2.4); P.vy=0; } }
     P.sprint=sprint;
   }
   // silah
   if(swapT>0)swapT-=dt; if(fireCd>0)fireCd-=dt;
   if(reloadT>0){ reloadT-=dt; if(reloadT<=0){ const w=LOADOUT[cur]; const need=w.mag-ammo[cur], take=Math.min(need,reserve[cur]); ammo[cur]+=take; reserve[cur]-=take; sndClick(); } }
   const w=LOADOUT[cur];
-  if(P.alive&&state==='play'&&mouseDown&&fireCd<=0&&reloadT<=0&&swapT<=0&&!P.sprint&&!w.empty&&!P.air&&!P.veh){
+  if(P.alive&&state==='play'&&mouseDown&&fireCd<=0&&reloadT<=0&&swapT<=0&&!P.sprint&&!w.empty&&!P.air&&!P.veh&&!underW){
     if(ammo[cur]>0){ playerShoot(); if(!w.auto)mouseDown=false; }
     else startReload();
   }
@@ -1318,6 +1320,7 @@ function updatePlayer(dt){
   camera.position.set(P.x,P.y+eye+bob,P.z);
   camera.rotation.set(P.pitch+recoil,P.yaw,P.alive?0:0.5);
   if(P.veh&&P.alive&&typeof vehCamera==='function')vehCamera(dt);
+  { const uw=!!(P.alive&&mode==='br'&&!P.veh&&camera.position.y<0.25&&waterDepth(camera.position.x,camera.position.z)>0); if(uw!==underW){ underW=uw; $('uw').style.display=uw?'block':'none'; } }
   if(!P.alive&&MP.play&&mode==='br'&&!BR.dm) specCam();
   if(DBG.cam){ camera.position.set(DBG.cam[0],DBG.cam[1],DBG.cam[2]); camera.lookAt(DBG.cam[3],DBG.cam[4],DBG.cam[5]); }
   // viewmodel
@@ -1452,7 +1455,7 @@ function buildBRWorld(){
   // yollar, pistler, bölgeler
   const S=BRS, K=S/1.9, BX=Math.round(80*(S-1)), BZ=-Math.round(63*(S-1)); // askerî üs ötelemesi
   const sc=v=>Math.abs(v)>10?v*K:v;
-  const RIVX=-0.42*H, RIVW=22, BRIDGES=[-0.55*H,0,0.55*H], LAKES=[{x:0.5*H,z:0.45*H,r:58},{x:-0.2*H,z:-0.62*H,r:30}];
+  const RIVX=-0.42*H, RIVW=22, BRIDGES=[-0.55*H,0,0.55*H], LAKES=[{x:0.5*H,z:0.45*H,r:58,deep:4.2},{x:-0.2*H,z:-0.62*H,r:30,deep:3.2}];
   BR.waters={rivers:[{x:RIVX,hw:RIVW/2}],bridges:BRIDGES,bw:5.5,lakes:LAKES};
   resv(-H+2,H-2,-6,6); resv(-6,6,-H+2,H-2); resv(122*S-12,122*S+12,-75*S-112,-75*S+112); resv(46+BX,114+BX,-100+BZ,-26+BZ);
   resv(RIVX-RIVW/2-3,RIVX+RIVW/2+3,-H,H); LAKES.forEach(l=>resv(l.x-l.r-4,l.x+l.r+4,l.z-l.r-4,l.z+l.r+4));
@@ -1530,11 +1533,13 @@ function buildBRWorld(){
     }
   });
   // nehir, göller, köprüler (suda yavaşlanır; köprüden geçilir)
-  { const wm=new THREE.MeshStandardMaterial({color:0x2d6e98,roughness:0.15,metalness:0.1,transparent:true,opacity:0.92,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-4});
+  { const wm=new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:0.15,metalness:0.1,transparent:true,opacity:0.94,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-4});
+    const shallow=new THREE.Color(0x58a9bd),deepC=new THREE.Color(0x0a3556),cc=new THREE.Color();
+    const paint=(g,fn)=>{ const ps=g.attributes.position,col=new Float32Array(ps.count*3); for(let i=0;i<ps.count;i++){ cc.copy(shallow).lerp(deepC,Math.min(1,Math.max(0,fn(ps.getX(i),ps.getY(i))))); col[i*3]=cc.r;col[i*3+1]=cc.g;col[i*3+2]=cc.b; } g.setAttribute('color',new THREE.BufferAttribute(col,3)); return g; };
     const sm=new THREE.MeshStandardMaterial({color:0xb9aa7c,roughness:1,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2});
-    const rv=new THREE.Mesh(new THREE.PlaneGeometry(RIVW,2*H+40),wm); rv.rotation.x=-Math.PI/2; rv.position.set(RIVX,0.2,0); rv.receiveShadow=true; grp.add(rv);
+    const rv=new THREE.Mesh(paint(new THREE.PlaneGeometry(RIVW,2*H+40,12,1),(x,y)=>(1-Math.abs(x)/(RIVW/2))*1.6),wm); rv.rotation.x=-Math.PI/2; rv.position.set(RIVX,0.2,0); rv.receiveShadow=true; grp.add(rv);
     { const sh=new THREE.Mesh(new THREE.PlaneGeometry(RIVW+8,2*H+40),sm); sh.rotation.x=-Math.PI/2; sh.position.set(RIVX,0.1,0); grp.add(sh); }
-    for(const l of LAKES){ const lm=new THREE.Mesh(new THREE.CircleGeometry(l.r,40),wm); lm.rotation.x=-Math.PI/2; lm.position.set(l.x,0.2,l.z); lm.receiveShadow=true; grp.add(lm);
+    for(const l of LAKES){ const lm=new THREE.Mesh(paint(new THREE.CircleGeometry(l.r,48),(x,y)=>(1-Math.hypot(x,y)/l.r)*1.5),wm); lm.rotation.x=-Math.PI/2; lm.position.set(l.x,0.2,l.z); lm.receiveShadow=true; grp.add(lm);
       const sh=new THREE.Mesh(new THREE.CircleGeometry(l.r+4,40),sm); sh.rotation.x=-Math.PI/2; sh.position.set(l.x,0.1,l.z); grp.add(sh); }
     for(const bz of BRIDGES){ add(RIVX,bz,RIVW+8,11,0.2,'floor',0.15,true);
       add(RIVX,bz-5.3,RIVW+8,0.3,1.1,'low'); add(RIVX,bz+5.3,RIVW+8,0.3,1.1,'low'); } }

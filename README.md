@@ -81,7 +81,7 @@ yalnızca DoS'u kesiyor, hileyi kesmiyor.
 - Battle Royale: dünya, eşyalar ve çember odanın tohumundan türetilir (herkeste aynı). Eşya alma ve araca binme sunucuda hakemlenir.
 
 ## Battle Royale haritası ve araçlar
-- Harita ~6 kat büyütüldü (750 × 750 m); nehir (köprülü), iki göl (suda yavaşlanır, araçlar zor geçer) ve basamaklı tepeler var: yeni kasabalar, yollar, daha çok ağaç/kaya/konteyner; çember ve paraşüt irtifası buna göre ölçeklendi.
+- Harita ~6 kat büyütüldü (750 × 750 m); nehir (köprülü), iki derin göl (ortası 3-4 m, suya batılır, yavaşlanır, su altında ateş edilemez; araçlar zor geçer) ve basamaklı tepeler var: yeni kasabalar, yollar, daha çok ağaç/kaya/konteyner; çember ve paraşüt irtifası buna göre ölçeklendi.
 - **Tank:** top (patlayıcı mermi, alan hasarı), çarptığını ezer, fareyle namlu yönü.
 - **Makineli jip:** 2 kişilik. Çok oyunculuda ikinci oyuncu yolcu/nişancı olarak binip makineli tüfeği kullanır; sürücü inerse yolcu direksiyona geçer.
 - Helikopter ve uçak da ateş eder.
