@@ -527,9 +527,12 @@ function hitsBoxes(x,z,y0,y1,r){
 const NAV={cs:2,n:0,half:150,blocked:null};
 function buildNav(half){
   NAV.half=half; NAV.n=Math.ceil(half*2/NAV.cs); NAV.blocked=new Uint8Array(NAV.n*NAV.n);
-  for(let gz=0;gz<NAV.n;gz++)for(let gx=0;gx<NAV.n;gx++){
-    const x=-half+(gx+0.5)*NAV.cs, z=-half+(gz+0.5)*NAV.cs;
-    NAV.blocked[gz*NAV.n+gx]=blockedAt(x,z,0.75,0)?1:0; }
+  const cs=NAV.cs,n=NAV.n,r=0.75;
+  for(let i=0;i<BOXES.length;i++){ const b=BOXES[i]; if(!(b.maxy>0.3&&b.miny<1.7))continue;
+    const g0=Math.max(0,Math.floor((b.minx-r+half)/cs-0.5)),g1=Math.min(n-1,Math.ceil((b.maxx+r+half)/cs-0.5));
+    const h0=Math.max(0,Math.floor((b.minz-r+half)/cs-0.5)),h1=Math.min(n-1,Math.ceil((b.maxz+r+half)/cs-0.5));
+    for(let gz=h0;gz<=h1;gz++){ const z=-half+(gz+0.5)*cs; if(!(z>b.minz-r&&z<b.maxz+r))continue;
+      for(let gx=g0;gx<=g1;gx++){ const x=-half+(gx+0.5)*cs; if(x>b.minx-r&&x<b.maxx+r)NAV.blocked[gz*n+gx]=1; } } }
 }
 function navIdx(x,z){ const n=NAV.n; return Math.max(0,Math.min(n-1,Math.floor((z+NAV.half)/NAV.cs)))*n+Math.max(0,Math.min(n-1,Math.floor((x+NAV.half)/NAV.cs))); }
 function navXZ(i){ const n=NAV.n; return [-NAV.half+((i%n)+0.5)*NAV.cs,-NAV.half+(((i/n)|0)+0.5)*NAV.cs]; }
@@ -1508,6 +1511,29 @@ function buildBRWorld(){
       BR.stairs.push({x:sx,z:z0-0.6,dirz:1,top:n*SH,house:hi}); break;
     }
   });
+  // terk edilmiş yüksek kuleler: dış spiral merdiven + çatıda korkuluk (keskin nişancı yuvası)
+  BR.towers=[];
+  const tower=(cx,cz)=>{
+    const w=12,d=12,t=0.5,SH2=0.28,n=60,h=n*SH2,gap=2.6,x0=cx-w/2,x1=cx+w/2;
+    add(cx,cz+d/2,w,t,h,'bld');
+    add((x0+cx-gap/2)/2,cz-d/2,(cx-gap/2)-x0,t,h,'bld'); add((cx+gap/2+x1)/2,cz-d/2,x1-(cx+gap/2),t,h,'bld'); add(cx,cz-d/2,gap,t,h-2.6,'bld',2.6);
+    add(cx-w/2,cz,t,d-t,h,'bld'); add(cx+w/2,cz,t,d-t,h,'bld');
+    add(cx,cz,w+0.8,d+0.8,0.3,'roof',h-0.3); add(cx,cz,w-0.2,d-0.2,0.05,'floor',0,true);
+    // çatı korkuluğu (girişte boşluk)
+    add(cx,cz+6.3,12.8,0.3,1.0,'low',h); add(cx-6.3,cz,0.3,12.8,1.0,'low',h); add(cx-0.9,cz-6.3,11.0,0.3,1.0,'low',h); add(cx+6.3,cz+1.3,0.3,10.2,1.0,'low',h);
+    // dış spiral merdiven: güney kenar (doğuya), sonra doğu kenar (kuzeye)
+    const ax=w/2+1.4, az=d/2+1.4, per=n/2; let k=0;
+    const t0=(2*ax-1)/per; for(let j=0;j<per;j++){ k++; add(cx-ax+t0*(j+0.5),cz+az,t0,2.0,k*SH2,'low'); }
+    add(cx+ax,cz+az,2.0,2.0,k*SH2,'low'); // köşe sahanlığı
+    const t1=(2*az-1)/per; for(let j=0;j<per;j++){ k++; add(cx+ax,cz+az-1-t1*(j+0.5),2.0,t1,k*SH2,'low'); }
+    add(cx+5.7,cz-7.4,1.4,2.0,0.3,'roof',h-0.3); // çatıya geçiş
+    BR.houses.push({cx,cz,w,d,h}); BR.doors.push({x:cx,z:cz-d/2-2.2}); BR.towers.push({cx,cz,h});
+    for(let i=0;i<3;i++) BR.spots.push({x:cx+rr(-4,4),z:cz+rr(-4,4)});
+    BR.spots.push({x:cx-2.5,z:cz+1,y:h,sn:1}); BR.spots.push({x:cx+1.5,z:cz+2.5,y:h});
+  };
+  { const T=[[-120,-100],[110,110],[-200,60],[180,-20],[20,-190],[-30,200],[-130,150],[130,-190],[230,170],[-240,-170],[60,70],[-50,-40]]; let placed=0;
+    for(const tp of T){ for(let q=0;q<14;q++){ const cx=tp[0]+rr(-30,30), cz=tp[1]+rr(-30,30); if(Math.abs(cx)>H-26||Math.abs(cz)>H-26)continue;
+      const rect={x0:cx-11,x1:cx+11,z0:cz-11,z1:cz+11}; if(reserved.some(r=>ovl(r,rect)))continue; reserved.push(rect); tower(cx,cz); placed++; break; } } }
   // birleştirilmiş statik ağlar
   for(const k in merged){ const kk=KINDS[k]; const m=new THREE.Mesh(mergeGeos(merged[k]),new THREE.MeshStandardMaterial({map:kk[0],roughness:kk[2],metalness:kk[3]})); m.castShadow=(k!=='floor'); m.receiveShadow=true; grp.add(m); }
   // zemin
@@ -1518,11 +1544,16 @@ function buildBRWorld(){
     bake(new THREE.ConeGeometry(1.6,3.2,8),0,5.6,0,0,0,0,1,1,1,0x365630),bake(new THREE.ConeGeometry(1.1,2.6,8),0,7.2,0,0,0,0,1,1,1,0x3d6236)]);
   const oak=mergeGeos([bake(new THREE.CylinderGeometry(0.3,0.42,3.2,7),0,1.6,0,0,0,0,1,1,1,0x5e4632),bake(new THREE.SphereGeometry(2.0,10,8),0,4.5,0,0,0,0,1,0.85,1,0x4f6b2e),
     bake(new THREE.SphereGeometry(1.5,9,7),1.2,3.9,0.4,0,0,0,1,1,1,0x5a7834),bake(new THREE.SphereGeometry(1.4,9,7),-1.0,4.0,-0.6,0,0,0,1,1,1,0x466228)]);
-  const trees=[]; let tries=0;
-  while(trees.length<830&&tries++<12000){
+  const trees=[]; let tries=0; const tgrid=new Set();
+  const addTree=(x,z)=>{ const key=Math.round(x/2.4)+','+Math.round(z/2.4); if(tgrid.has(key))return; tgrid.add(key); trees.push({x,z,s:rr(0.8,1.4),r:R()*6.28,pine:R()<0.62}); };
+  // sık ormanlar
+  for(let f=0;f<24;f++){ const fx=rr(-H+30,H-30),fz=rr(-H+30,H-30),fr=rr(30,62),cnt=Math.floor(fr*fr*0.07);
+    for(let q=0;q<cnt;q++){ const a=R()*6.283,rd=Math.sqrt(R())*fr,x=fx+Math.cos(a)*rd,z=fz+Math.sin(a)*rd; if(Math.abs(x)>H-4||Math.abs(z)>H-4)continue;
+      const rect={x0:x-1.5,x1:x+1.5,z0:z-1.5,z1:z+1.5}; if(reserved.some(r=>ovl(r,rect)))continue; addTree(x,z); } }
+  while(trees.length<2900&&tries++<14000){
     const x=rr(-H+4,H-4),z=rr(-H+4,H-4); const rect={x0:x-1.5,x1:x+1.5,z0:z-1.5,z1:z+1.5};
     if(reserved.some(r=>ovl(r,rect)))continue; const edge=Math.max(Math.abs(x),Math.abs(z))>85*S; if(R()>(edge?0.8:0.3))continue;
-    trees.push({x,z,s:rr(0.8,1.35),r:R()*6.28,pine:R()<0.62});
+    addTree(x,z);
   }
   const mkInst=(geo,list)=>{ const im=new THREE.InstancedMesh(geo,ACCM,Math.max(1,list.length)); const m4=new THREE.Matrix4(),q=new THREE.Quaternion(),sc=new THREE.Vector3(),ps=new THREE.Vector3(),e=new THREE.Euler();
     list.forEach((t,i)=>{ e.set(0,t.r,0); q.setFromEuler(e); ps.set(t.x,0,t.z); sc.set(t.s,t.s,t.s); m4.compose(ps,q,sc); im.setMatrixAt(i,m4); });
@@ -1732,7 +1763,9 @@ function spawnItems(){
   while(BR.itemGrp.children.length)BR.itemGrp.remove(BR.itemGrp.children[0]); BR.items=[];
   BR.spots.forEach((sp,i)=>{
     const r=brRand(); let it; const id='s'+i;
-    if(r<0.46) it=makeItem('w',randomWeapon(),sp.x,sp.z,id); else if(r<0.64) it=makeItem('hp',null,sp.x,sp.z,id); else if(r<0.77) it=makeItem('ar',null,sp.x,sp.z,id); else it=makeItem('am',null,sp.x,sp.z,id);
+    if(sp.sn) it=makeItem('w',WBYID.sahin,sp.x,sp.z,id);
+    else if(r<0.46) it=makeItem('w',randomWeapon(),sp.x,sp.z,id); else if(r<0.64) it=makeItem('hp',null,sp.x,sp.z,id); else if(r<0.77) it=makeItem('ar',null,sp.x,sp.z,id); else it=makeItem('am',null,sp.x,sp.z,id);
+    if(sp.y){ it.y=sp.y; it.mesh.position.y=0.55+sp.y; }
     BR.items.push(it);
   });
 }
@@ -2011,7 +2044,7 @@ function updateVehiclesIdle(dt){
 function updateNear(dt){
   BR.nearItem=null; BR.nearVeh=null; let txt='';
   if(P.alive&&!P.air&&!P.veh){
-    let bd=2.4; for(const it of BR.items){ if(!it.alive)continue; const d=Math.hypot(it.x-P.x,it.z-P.z); if(d<bd&&Math.abs(P.y)<3.2){ bd=d; BR.nearItem=it; } }
+    let bd=2.4; for(const it of BR.items){ if(!it.alive)continue; const d=Math.hypot(it.x-P.x,it.z-P.z); if(d<bd&&Math.abs(P.y-(it.y||0))<3.2){ bd=d; BR.nearItem=it; } }
     if(BR.nearItem) txt='E: Al - '+itemName(BR.nearItem);
     else{ let bv=1e9; for(const v of BR.vehicles){ if(v.occupied&&!(MP.play&&v.type==='jeep'&&v.driver&&!v.pass))continue; const d=Math.hypot(v.x-P.x,v.z-P.z); if(d<VRANGE[v.type]&&d<bv&&Math.abs(v.y-P.y)<3){ bv=d; BR.nearVeh=v; } }
       if(BR.nearVeh) txt=BR.nearVeh.occupied?'E: Yolcu olarak bin - '+VNAME[BR.nearVeh.type]:'E: Araca bin - '+VNAME[BR.nearVeh.type]; }
@@ -2019,7 +2052,7 @@ function updateNear(dt){
   const pr=$('prompt'); if(txt&&IS_TOUCH_EARLY)txt=txt.replace('E: ','').replace('ile in','düğmesiyle in').replace('sonra E','sonra AL/BİN'); if(txt){ if(pr.textContent!==txt)pr.textContent=txt; pr.style.display='block'; } else pr.style.display='none';
   $('vinfo').style.display=P.veh?'block':'none';
   const bob=now*2;
-  for(const it of BR.items){ if(!it.alive)continue; const d=Math.abs(it.x-P.x)+Math.abs(it.z-P.z); it.mesh.visible=d<140; if(d<50){ it.mesh.position.y=0.65+Math.sin(bob+it.x)*0.08; it.mesh.rotation.y=bob*0.8; } }
+  for(const it of BR.items){ if(!it.alive)continue; const d=Math.abs(it.x-P.x)+Math.abs(it.z-P.z); it.mesh.visible=d<140; if(d<50){ it.mesh.position.y=(it.y||0)+0.65+Math.sin(bob+it.x)*0.08; it.mesh.rotation.y=bob*0.8; } }
 }
 
 /* ---------- El bombası, sis bombası, bıçak ---------- */
