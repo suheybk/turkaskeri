@@ -796,6 +796,7 @@ function waterDepth(x,z){
   const W=BR.waters; if(!W||!BR.built||mode!=='br')return 0;
   for(const r of W.rivers){ const dx=Math.abs(x-r.x); if(dx<r.hw){ let br=false; for(const bz of W.bridges){ if(Math.abs(z-bz)<W.bw){ br=true; break; } } if(!br)return 2.4*Math.min(1,(1-dx/r.hw)*2.2); } }
   for(const l of W.lakes){ const d=Math.hypot(x-l.x,z-l.z); if(d<l.r)return l.deep*Math.min(1,(1-d/l.r)*1.9); }
+  for(const k of W.creeks){ const u=k.o==='x'?z-k.c:x-k.c, v=k.o==='x'?x:z; if(Math.abs(u)<k.hw&&v>k.a&&v<k.b)return k.deep*Math.min(1,(1-Math.abs(u)/k.hw)*2.5); }
   return 0;
 }
 function inWater(x,z){ return waterDepth(x,z)>0; }
@@ -1456,7 +1457,9 @@ function buildBRWorld(){
   const S=BRS, K=S/1.9, BX=Math.round(80*(S-1)), BZ=-Math.round(63*(S-1)); // askerî üs ötelemesi
   const sc=v=>Math.abs(v)>10?v*K:v;
   const RIVX=-0.42*H, RIVW=22, BRIDGES=[-0.55*H,0,0.55*H], LAKES=[{x:0.5*H,z:0.45*H,r:58,deep:4.2},{x:-0.2*H,z:-0.62*H,r:30,deep:3.2}];
-  BR.waters={rivers:[{x:RIVX,hw:RIVW/2}],bridges:BRIDGES,bw:5.5,lakes:LAKES};
+  const CREEKS=[{o:'x',c:LAKES[0].z,hw:4,deep:0.8,a:RIVX+RIVW/2,b:LAKES[0].x-LAKES[0].r},{o:'x',c:LAKES[1].z,hw:4,deep:0.8,a:RIVX+RIVW/2,b:LAKES[1].x-LAKES[1].r},{o:'z',c:LAKES[0].x,hw:3.5,deep:0.7,a:-0.2*H,b:LAKES[0].z-LAKES[0].r},{o:'z',c:0.28*H,hw:3.5,deep:0.7,a:-0.9*H,b:-0.35*H}];
+  BR.waters={rivers:[{x:RIVX,hw:RIVW/2}],bridges:BRIDGES,bw:5.5,lakes:LAKES,creeks:CREEKS};
+  CREEKS.forEach(k=>{ if(k.o==='x')resv(k.a,k.b,k.c-k.hw-3,k.c+k.hw+3); else resv(k.c-k.hw-3,k.c+k.hw+3,k.a,k.b); });
   resv(-H+2,H-2,-6,6); resv(-6,6,-H+2,H-2); resv(122*S-12,122*S+12,-75*S-112,-75*S+112); resv(46+BX,114+BX,-100+BZ,-26+BZ);
   resv(RIVX-RIVW/2-3,RIVX+RIVW/2+3,-H,H); LAKES.forEach(l=>resv(l.x-l.r-4,l.x+l.r+4,l.z-l.r-4,l.z+l.r+4));
   const PADS=[[95+BX,-40+BZ],[-61*S,62*S]]; PADS.forEach(p=>resv(p[0]-12,p[0]+12,p[1]-12,p[1]+12));
@@ -1541,6 +1544,11 @@ function buildBRWorld(){
     { const sh=new THREE.Mesh(new THREE.PlaneGeometry(RIVW+8,2*H+40),sm); sh.rotation.x=-Math.PI/2; sh.position.set(RIVX,0.1,0); grp.add(sh); }
     for(const l of LAKES){ const lm=new THREE.Mesh(paint(new THREE.CircleGeometry(l.r,48),(x,y)=>(1-Math.hypot(x,y)/l.r)*1.5),wm); lm.rotation.x=-Math.PI/2; lm.position.set(l.x,0.2,l.z); lm.receiveShadow=true; grp.add(lm);
       const sh=new THREE.Mesh(new THREE.CircleGeometry(l.r+4,40),sm); sh.rotation.x=-Math.PI/2; sh.position.set(l.x,0.1,l.z); grp.add(sh); }
+    for(const k of CREEKS){ const len=k.b-k.a, mid=(k.a+k.b)/2; const gw=paint(new THREE.PlaneGeometry(2*k.hw,len,6,1),(x,y)=>(1-Math.abs(x)/k.hw)*0.7);
+      const m=new THREE.Mesh(gw,wm), sh=new THREE.Mesh(new THREE.PlaneGeometry(2*k.hw+5,len),sm);
+      if(k.o==='x'){ m.rotation.set(-Math.PI/2,0,Math.PI/2); sh.rotation.set(-Math.PI/2,0,Math.PI/2); m.position.set(mid,0.2,k.c); sh.position.set(mid,0.1,k.c); }
+      else{ m.rotation.x=-Math.PI/2; sh.rotation.x=-Math.PI/2; m.position.set(k.c,0.2,mid); sh.position.set(k.c,0.1,mid); }
+      grp.add(sh); grp.add(m); }
     for(const bz of BRIDGES){ add(RIVX,bz,RIVW+8,11,0.2,'floor',0.15,true);
       add(RIVX,bz-5.3,RIVW+8,0.3,1.1,'low'); add(RIVX,bz+5.3,RIVW+8,0.3,1.1,'low'); } }
   // terk edilmiş yüksek kuleler: içeriden spiral merdiven (kapıdan girilir), çatıda açıklıktan çıkılır, korkuluk
