@@ -1530,10 +1530,13 @@ function buildBRWorld(){
     }
   });
   // nehir, göller, köprüler (suda yavaşlanır; köprüden geçilir)
-  { const wm=new THREE.MeshStandardMaterial({color:0x2d6e98,roughness:0.15,metalness:0.1,transparent:true,opacity:0.9});
-    const rv=new THREE.Mesh(new THREE.PlaneGeometry(RIVW,2*H+40),wm); rv.rotation.x=-Math.PI/2; rv.position.set(RIVX,0.06,0); rv.receiveShadow=true; grp.add(rv);
-    for(const l of LAKES){ const lm=new THREE.Mesh(new THREE.CircleGeometry(l.r,40),wm); lm.rotation.x=-Math.PI/2; lm.position.set(l.x,0.06,l.z); lm.receiveShadow=true; grp.add(lm); }
-    for(const bz of BRIDGES){ add(RIVX,bz,RIVW+8,11,0.12,'floor',0.05,true);
+  { const wm=new THREE.MeshStandardMaterial({color:0x2d6e98,roughness:0.15,metalness:0.1,transparent:true,opacity:0.92,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-4});
+    const sm=new THREE.MeshStandardMaterial({color:0xb9aa7c,roughness:1,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2});
+    const rv=new THREE.Mesh(new THREE.PlaneGeometry(RIVW,2*H+40),wm); rv.rotation.x=-Math.PI/2; rv.position.set(RIVX,0.2,0); rv.receiveShadow=true; grp.add(rv);
+    { const sh=new THREE.Mesh(new THREE.PlaneGeometry(RIVW+8,2*H+40),sm); sh.rotation.x=-Math.PI/2; sh.position.set(RIVX,0.1,0); grp.add(sh); }
+    for(const l of LAKES){ const lm=new THREE.Mesh(new THREE.CircleGeometry(l.r,40),wm); lm.rotation.x=-Math.PI/2; lm.position.set(l.x,0.2,l.z); lm.receiveShadow=true; grp.add(lm);
+      const sh=new THREE.Mesh(new THREE.CircleGeometry(l.r+4,40),sm); sh.rotation.x=-Math.PI/2; sh.position.set(l.x,0.1,l.z); grp.add(sh); }
+    for(const bz of BRIDGES){ add(RIVX,bz,RIVW+8,11,0.2,'floor',0.15,true);
       add(RIVX,bz-5.3,RIVW+8,0.3,1.1,'low'); add(RIVX,bz+5.3,RIVW+8,0.3,1.1,'low'); } }
   // terk edilmiş yüksek kuleler: içeriden spiral merdiven (kapıdan girilir), çatıda açıklıktan çıkılır, korkuluk
   BR.towers=[];
