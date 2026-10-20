@@ -792,6 +792,12 @@ const tracers=[], parts=[];
 })();
 let trI=0,paI=0;
 const _a=new THREE.Vector3(),_b=new THREE.Vector3();
+function inWater(x,z){
+  const W=BR.waters; if(!W||!BR.built)return false;
+  for(const r of W.rivers){ if(Math.abs(x-r.x)<r.hw){ let br=false; for(const bz of W.bridges){ if(Math.abs(z-bz)<W.bw){ br=true; break; } } if(!br)return true; } }
+  for(const l of W.lakes){ if(Math.hypot(x-l.x,z-l.z)<l.r)return true; }
+  return false;
+}
 function tracer(ax,ay,az,bx,by,bz){
   const t=tracers[trI++%tracers.length]; _a.set(ax,ay,az); _b.set(bx,by,bz);
   const len=_a.distanceTo(_b); if(len<0.3)return;
@@ -1278,7 +1284,7 @@ function updatePlayer(dt){
     const sprint=keys.ShiftLeft&&keys.KeyW&&!mouseR&&reloadT<=0;
     let ix=(keys.KeyD?1:0)-(keys.KeyA?1:0), iz=(keys.KeyW?1:0)-(keys.KeyS?1:0);
     const il=Math.hypot(ix,iz)||1; ix/=il; iz/=il;
-    const sp=(sprint?7.2:4.8)*(adsK>0.5?0.62:1)*T.spd;
+    const sp=(sprint?7.2:4.8)*(adsK>0.5?0.62:1)*T.spd*((mode==='br'&&P.y<0.3&&inWater(P.x,P.z))?0.45:1);
     const fx=-Math.sin(P.yaw),fz=-Math.cos(P.yaw),rx=Math.cos(P.yaw),rz=-Math.sin(P.yaw);
     const tvx=(fx*iz+rx*ix)*sp, tvz=(fz*iz+rz*ix)*sp, k=1-Math.exp(-(P.y>0.05?3:13)*dt);
     P.vx+=(tvx-P.vx)*k; P.vz+=(tvz-P.vz)*k;
@@ -1407,13 +1413,13 @@ const skyMesh=(function(){
 })();
 
 /* ---------- Battle Royale dünyası ---------- */
-const BRS=1.9;
-const BR={built:false,half:285,boxes:[],doors:[],houses:[],spots:[],items:[],grp:null,zone:null,alive:0,over:false,endT:0,place:0,vehSpawns:[],vehicles:[],zoneMesh:null};
+const BRS=2.5;
+const BR={built:false,half:375,boxes:[],doors:[],houses:[],spots:[],items:[],grp:null,zone:null,alive:0,over:false,endT:0,place:0,vehSpawns:[],vehicles:[],zoneMesh:null};
 let mode='tdm';
 const EMPTY={id:'bos',name:'Boş',cls:'',lvl:99,kind:'none',auto:false,rate:1,dmg:0,mag:0,res:0,reload:1,spread:0.01,recoil:0,range:1,pitch:900,ads:[0,-0.17,-0.35],len:0.2,empty:true};
 const ENV={name:'Kaza',team:'a',side:'env',css:'#ece8d8',isPlayer:false,kills:0};
 const ZONEA={name:'Çember',team:'a',side:'zone',css:'#4aa3ff',isPlayer:false,kills:0};
-const PHASES=[{wait:50,shrink:50,r:215,dmg:2},{wait:40,shrink:42,r:137,dmg:4},{wait:32,shrink:34,r:76,dmg:7},{wait:24,shrink:28,r:34,dmg:12},{wait:18,shrink:22,r:10,dmg:20}];
+const PHASES=[{wait:55,shrink:60,r:290,dmg:2},{wait:42,shrink:50,r:185,dmg:4},{wait:34,shrink:40,r:100,dmg:7},{wait:26,shrink:30,r:45,dmg:12},{wait:18,shrink:24,r:12,dmg:20}];
 function brZ0(){ return BR.dm?150:Math.round(BR.half*1.5); }
 function rng(seed){ let s=seed>>>0; return ()=>((s=(Math.imul(s,1664525)+1013904223)>>>0)/4294967296); }
 
@@ -1434,7 +1440,7 @@ function buildBRWorld(){
   TEX.roof=ctex(128,128,(g,w,h)=>{ g.fillStyle='#7a4638'; g.fillRect(0,0,w,h); for(let y=0;y<h;y+=10){ g.fillStyle=(y/10)%2?'rgba(0,0,0,.18)':'rgba(255,255,255,.07)'; g.fillRect(0,y,w,10); } speckle(g,w,h,1800,.22); });
   TEX.wood=ctex(128,128,(g,w,h)=>{ g.fillStyle='#7d6347'; g.fillRect(0,0,w,h); for(let x=0;x<w;x+=16){ g.fillStyle='rgba(0,0,0,.22)'; g.fillRect(x,0,2,h); } speckle(g,w,h,2000,.2); });
   const KINDS={bld:[TEX.bld,4,0.95,0],roof:[TEX.roof,3,0.9,0],floor:[TEX.wood,2,1,0],hangar:[TEX.hangar,4,0.9,0],cont0:[TEX.cont[0],3,0.7,0.25],cont1:[TEX.cont[1],3,0.7,0.25],
-    cont2:[TEX.cont[2],3,0.7,0.25],crate:[TEX.crate,1.6,0.95,0],low:[TEX.low,2,0.95,0],wall:[TEX.wall,4,0.95,0],tank:[TEX.tank,3,0.7,0.2]};
+    cont2:[TEX.cont[2],3,0.7,0.25],crate:[TEX.crate,1.6,0.95,0],low:[TEX.low,2,0.95,0],wall:[TEX.wall,4,0.95,0],tank:[TEX.tank,3,0.7,0.2],hill:[TEX.grass,6,1,0]};
   const grp=new THREE.Group(); scene.add(grp); BR.grp=grp; const boxes=BR.boxes; const merged={};
   const add=(cx,cz,w,d,h,kind,y0,noCol)=>{
     y0=y0||0; const b={cx,cz,w,d,h:y0+h,kind,minx:cx-w/2,maxx:cx+w/2,minz:cz-d/2,maxz:cz+d/2,miny:y0,maxy:y0+h};
@@ -1444,10 +1450,14 @@ function buildBRWorld(){
   const reserved=[]; const resv=(x0,x1,z0,z1)=>reserved.push({x0,x1,z0,z1});
   const ovl=(a,b)=>!(a.x1<b.x0||a.x0>b.x1||a.z1<b.z0||a.z0>b.z1);
   // yollar, pistler, bölgeler
-  const S=BRS, BX=72, BZ=-57; // askerî üs ötelemesi
-  resv(-H+2,H-2,-6,6); resv(-6,6,-H+2,H-2); resv(122*S-12,122*S+12,-75*S-112,-75*S+112); resv(155,179,-104,-90); resv(-124,-108,110,126); resv(46+BX,114+BX,-100+BZ,-26+BZ);
-  const PADS=[[95+BX,-40+BZ],[-61*S,62*S]];
-  const TANKS=[[105,-100,0],[105,-125,0],[-200,-90,0],[-90,-215,0],[215,120,0],[-215,170,0]]; TANKS.forEach(a=>resv(a[0]-7,a[0]+7,a[1]-9,a[1]+9)); resv(53,67,198,212);
+  const S=BRS, K=S/1.9, BX=Math.round(80*(S-1)), BZ=-Math.round(63*(S-1)); // askerî üs ötelemesi
+  const sc=v=>Math.abs(v)>10?v*K:v;
+  const RIVX=-0.42*H, RIVW=22, BRIDGES=[-0.55*H,0,0.55*H], LAKES=[{x:0.5*H,z:0.45*H,r:58},{x:-0.2*H,z:-0.62*H,r:30}];
+  BR.waters={rivers:[{x:RIVX,hw:RIVW/2}],bridges:BRIDGES,bw:5.5,lakes:LAKES};
+  resv(-H+2,H-2,-6,6); resv(-6,6,-H+2,H-2); resv(122*S-12,122*S+12,-75*S-112,-75*S+112); resv(46+BX,114+BX,-100+BZ,-26+BZ);
+  resv(RIVX-RIVW/2-3,RIVX+RIVW/2+3,-H,H); LAKES.forEach(l=>resv(l.x-l.r-4,l.x+l.r+4,l.z-l.r-4,l.z+l.r+4));
+  const PADS=[[95+BX,-40+BZ],[-61*S,62*S]]; PADS.forEach(p=>resv(p[0]-12,p[0]+12,p[1]-12,p[1]+12));
+  const TANKS=[[105,-100,0],[105,-125,0],[-200,-90,0],[-90,-215,0],[215,120,0],[-215,170,0],[250,-215,0],[-260,260,0]].map(a=>[sc(a[0]),sc(a[1]),a[2]]); TANKS.forEach(a=>resv(a[0]-7,a[0]+7,a[1]-9,a[1]+9)); const HELI3=[sc(60),sc(205)]; resv(HELI3[0]-8,HELI3[0]+8,HELI3[1]-9,HELI3[1]+9);
   // yollar (görsel)
   const flat=[]; const strip=(x,z,w,d,tex)=>{ const g=new THREE.PlaneGeometry(w,d); const uv=g.attributes.uv; for(let i=0;i<uv.count;i++)uv.setXY(i,uv.getX(i)*w/6,uv.getY(i)*d/6); return bake(g,x,0.03,z,-Math.PI/2,0,0); };
   const RD=[[32*S,30*S,50*S,5],[-75*S,-31*S,5,56*S],[-80*S,38*S,5,64*S],[44*S,85*S,76*S,5],[54*S,-62*S,90*S,5],[-30*S,-95*S,60*S,5],[110*S,40*S,5,70*S],[-120*S,-70*S,60*S,5]];
@@ -1483,8 +1493,16 @@ function buildBRWorld(){
       reserved.push(rect); house(cx,cz,w,d,cfg.o); return true; }
     return false;
   };
+  // tepeler: basamaklı (0.28 m) yamaçlar, tepede eşya
+  BR.hills=[];
+  { for(let q=0;q<14;q++){ for(let tr=0;tr<30;tr++){ const w=rr(46,80),d=rr(40,70),cx=rr(-H+60,H-60),cz=rr(-H+60,H-60);
+      const rect={x0:cx-w/2-3,x1:cx+w/2+3,z0:cz-d/2-3,z1:cz+d/2+3}; if(reserved.some(r=>ovl(r,rect)))continue; reserved.push(rect);
+      const L=Math.floor(rr(20,30)), inset=(Math.min(w,d)/2-3.5)/L;
+      for(let k=0;k<L;k++) add(cx,cz,w-2*k*inset,d-2*k*inset,(k+1)*0.28,'hill');
+      const top=L*0.28; BR.hills.push({cx,cz,w,d,top}); BR.spots.push({x:cx,z:cz,y:top}); break; } } }
   const TOWNS=[{x:34,z:32,k:8,s:30},{x:-75,z:-62,k:5,s:26},{x:-80,z:72,k:5,s:26,big:true},{x:80,z:88,k:5,s:24},{x:-35,z:-105,k:4,s:20},{x:-25,z:108,k:4,s:20}]
-    .map(t=>({x:t.x*S,z:t.z*S,k:t.k*2,s:t.s*1.35,big:t.big})).concat([{x:150,z:60,k:7,s:34,big:true},{x:-190,z:-170,k:7,s:34},{x:170,z:210,k:7,s:34},{x:-215,z:10,k:6,s:30},{x:40,z:-215,k:6,s:30},{x:-60,z:215,k:6,s:30},{x:215,z:-20,k:5,s:26}]);
+    .map(t=>({x:t.x*S,z:t.z*S,k:t.k*2,s:t.s*1.35,big:t.big})).concat([{x:150,z:60,k:7,s:34,big:true},{x:-190,z:-170,k:7,s:34},{x:170,z:210,k:7,s:34},{x:-215,z:10,k:6,s:30},{x:40,z:-215,k:6,s:30},{x:-60,z:215,k:6,s:30},{x:215,z:-20,k:5,s:26}].map(t=>({x:t.x*K,z:t.z*K,k:t.k,s:t.s,big:t.big})))
+    .concat([{x:300,z:-90,k:6,s:30},{x:-300,z:-30,k:6,s:30},{x:-300,z:250,k:6,s:30},{x:310,z:300,k:6,s:30},{x:-120,z:330,k:5,s:26},{x:130,z:-330,k:6,s:30},{x:-250,z:-300,k:6,s:30},{x:60,z:330,k:5,s:26},{x:-40,z:-330,k:5,s:26}]);
   for(const t of TOWNS) for(let i=0;i<t.k;i++){ if(t.big&&i<2) tryHouse(t.x,t.z,t.s,{w:rr(14,18),d:rr(10,12),o:{h:4.4}}); else tryHouse(t.x,t.z,t.s); }
   // askerî üs
   house(60+BX,-48+BZ,14,8,{dS:-3,dN:3}); house(60+BX,-62+BZ,14,8,{dS:3,dN:-3}); house(60+BX,-76+BZ,14,8,{dS:-3,dN:3});
@@ -1493,8 +1511,8 @@ function buildBRWorld(){
   for(let i=0;i<10;i++) BR.spots.push({x:rr(62+BX,108+BX),z:rr(-98+BZ,-52+BZ)});
   // ekstra açık hava düzenlemeleri (konteyner, sandık)
   const props=['cont0','cont1','cont2'];
-  for(let i=0;i<50;i++){ const x=rr(-H+20,H-20),z=rr(-H+20,H-20),k=props[i%3],w=R()<0.5?6:2.4,d=w===6?2.4:6; const rect={x0:x-w/2-3,x1:x+w/2+3,z0:z-d/2-3,z1:z+d/2+3}; if(reserved.some(r=>ovl(r,rect)))continue; reserved.push(rect); add(x,z,w,d,2.8,k); BR.spots.push({x:x+(w===6?0:3.2),z:z+(w===6?3.2:0)}); }
-  for(let i=0;i<80;i++){ const x=rr(-H+15,H-15),z=rr(-H+15,H-15); const rect={x0:x-3,x1:x+3,z0:z-3,z1:z+3}; if(reserved.some(r=>ovl(r,rect)))continue; reserved.push(rect); add(x,z,1.6,1.6,1.1,'crate'); if(R()<0.4)BR.spots.push({x:x+2.2,z:z}); }
+  for(let i=0;i<90;i++){ const x=rr(-H+20,H-20),z=rr(-H+20,H-20),k=props[i%3],w=R()<0.5?6:2.4,d=w===6?2.4:6; const rect={x0:x-w/2-3,x1:x+w/2+3,z0:z-d/2-3,z1:z+d/2+3}; if(reserved.some(r=>ovl(r,rect)))continue; reserved.push(rect); add(x,z,w,d,2.8,k); BR.spots.push({x:x+(w===6?0:3.2),z:z+(w===6?3.2:0)}); }
+  for(let i=0;i<150;i++){ const x=rr(-H+15,H-15),z=rr(-H+15,H-15); const rect={x0:x-3,x1:x+3,z0:z-3,z1:z+3}; if(reserved.some(r=>ovl(r,rect)))continue; reserved.push(rect); add(x,z,1.6,1.6,1.1,'crate'); if(R()<0.4)BR.spots.push({x:x+2.2,z:z}); }
   // çevre duvarı
   add(0,-H-0.5,2*H+4,1,7,'wall'); add(0,H+0.5,2*H+4,1,7,'wall'); add(-H-0.5,0,1,2*H+4,7,'wall'); add(H+0.5,0,1,2*H+4,7,'wall');
   // çatılara çıkan dış merdivenler (sniper noktaları): basamak 0.28 m (0.3 altı: otomatik çıkılır)
@@ -1511,6 +1529,12 @@ function buildBRWorld(){
       BR.stairs.push({x:sx,z:z0-0.6,dirz:1,top:n*SH,house:hi}); break;
     }
   });
+  // nehir, göller, köprüler (suda yavaşlanır; köprüden geçilir)
+  { const wm=new THREE.MeshStandardMaterial({color:0x2d6e98,roughness:0.15,metalness:0.1,transparent:true,opacity:0.9});
+    const rv=new THREE.Mesh(new THREE.PlaneGeometry(RIVW,2*H+40),wm); rv.rotation.x=-Math.PI/2; rv.position.set(RIVX,0.06,0); rv.receiveShadow=true; grp.add(rv);
+    for(const l of LAKES){ const lm=new THREE.Mesh(new THREE.CircleGeometry(l.r,40),wm); lm.rotation.x=-Math.PI/2; lm.position.set(l.x,0.06,l.z); lm.receiveShadow=true; grp.add(lm); }
+    for(const bz of BRIDGES){ add(RIVX,bz,RIVW+8,11,0.12,'floor',0.05,true);
+      add(RIVX,bz-5.3,RIVW+8,0.3,1.1,'low'); add(RIVX,bz+5.3,RIVW+8,0.3,1.1,'low'); } }
   // terk edilmiş yüksek kuleler: içeriden spiral merdiven (kapıdan girilir), çatıda açıklıktan çıkılır, korkuluk
   BR.towers=[];
   const tower=(cx,cz)=>{
@@ -1534,7 +1558,7 @@ function buildBRWorld(){
     for(let i=0;i<3;i++) BR.spots.push({x:cx+rr(-2.5,2.5),z:cz+rr(-2.5,2.5)});
     BR.spots.push({x:cx-2.5,z:cz+1,y:h,sn:1}); BR.spots.push({x:cx+2.5,z:cz+2.5,y:h});
   };
-  { const T=[[-120,-100],[110,110],[-200,60],[180,-20],[20,-190],[-30,200],[-130,150],[130,-190],[230,170],[-240,-170],[60,70],[-50,-40]]; let placed=0;
+  { const T0=[[-120,-100],[110,110],[-200,60],[180,-20],[20,-190],[-30,200],[-130,150],[130,-190],[230,170],[-240,-170],[60,70],[-50,-40]]; const T=T0.map(a=>[a[0]*K,a[1]*K]).concat([[300,-300],[-300,300],[320,100],[-320,-120],[100,330],[-100,-330],[250,250],[-250,-250]]); let placed=0;
     for(const tp of T){ for(let q=0;q<14;q++){ const cx=tp[0]+rr(-30,30), cz=tp[1]+rr(-30,30); if(Math.abs(cx)>H-26||Math.abs(cz)>H-26)continue;
       const rect={x0:cx-11,x1:cx+11,z0:cz-11,z1:cz+11}; if(reserved.some(r=>ovl(r,rect)))continue; reserved.push(rect); tower(cx,cz); placed++; break; } } }
   // birleştirilmiş statik ağlar
@@ -1550,10 +1574,10 @@ function buildBRWorld(){
   const trees=[]; let tries=0; const tgrid=new Set();
   const addTree=(x,z)=>{ const key=Math.round(x/2.4)+','+Math.round(z/2.4); if(tgrid.has(key))return; tgrid.add(key); trees.push({x,z,s:rr(0.8,1.4),r:R()*6.28,pine:R()<0.62}); };
   // sık ormanlar
-  for(let f=0;f<24;f++){ const fx=rr(-H+30,H-30),fz=rr(-H+30,H-30),fr=rr(30,62),cnt=Math.floor(fr*fr*0.07);
+  for(let f=0;f<46;f++){ const fx=rr(-H+30,H-30),fz=rr(-H+30,H-30),fr=rr(30,62),cnt=Math.floor(fr*fr*0.07);
     for(let q=0;q<cnt;q++){ const a=R()*6.283,rd=Math.sqrt(R())*fr,x=fx+Math.cos(a)*rd,z=fz+Math.sin(a)*rd; if(Math.abs(x)>H-4||Math.abs(z)>H-4)continue;
       const rect={x0:x-1.5,x1:x+1.5,z0:z-1.5,z1:z+1.5}; if(reserved.some(r=>ovl(r,rect)))continue; addTree(x,z); } }
-  while(trees.length<2900&&tries++<14000){
+  while(trees.length<5200&&tries++<24000){
     const x=rr(-H+4,H-4),z=rr(-H+4,H-4); const rect={x0:x-1.5,x1:x+1.5,z0:z-1.5,z1:z+1.5};
     if(reserved.some(r=>ovl(r,rect)))continue; const edge=Math.max(Math.abs(x),Math.abs(z))>85*S; if(R()>(edge?0.8:0.3))continue;
     addTree(x,z);
@@ -1565,7 +1589,7 @@ function buildBRWorld(){
   for(const t of trees){ boxes.push({cx:t.x,cz:t.z,w:0.8,d:0.8,h:6,kind:'tree',minx:t.x-0.4,maxx:t.x+0.4,minz:t.z-0.4,maxz:t.z+0.4,miny:0,maxy:6}); }
   // kayalar
   const rocks=[]; tries=0;
-  while(rocks.length<90&&tries++<2000){
+  while(rocks.length<170&&tries++<3500){
     const x=rr(-H+8,H-8),z=rr(-H+8,H-8),w=rr(2.4,4.6),h=rr(1.4,2.8); const rect={x0:x-w,x1:x+w,z0:z-w,z1:z+w}; if(reserved.some(r=>ovl(r,rect)))continue; reserved.push(rect);
     rocks.push({x,z,w,h}); boxes.push({cx:x,cz:z,w:w*0.85,d:w*0.85,h,kind:'rock',minx:x-w*0.42,maxx:x+w*0.42,minz:z-w*0.42,maxz:z+w*0.42,miny:0,maxy:h*0.9});
   }
@@ -1582,12 +1606,15 @@ function buildBRWorld(){
   // araç doğma noktaları
   { const H2=Math.PI/2; BR.vehSpawns=[];
     const V=(t,x,z,yaw)=>BR.vehSpawns.push({t,x,z,yaw});
-    [[23,0,H2],[-76,0,H2],[118,0,-H2],[-150,0,H2],[200,0,-H2],[0,91,0],[0,-80,0],[0,-182,0]].forEach(a=>V('car',a[0],a[1],a[2]));
-    [[47,-2,H2],[-110,2,H2],[4,137,0],[-6,-118,0],[-225,2,H2],[2,245,0]].forEach(a=>V('bike',a[0],a[1],a[2]));
-    [[70,3,H2],[-35,-3,H2],[160,3,-H2],[-190,-3,H2],[3,-150,0],[-3,170,0],[3,50,0],[-3,-220,0]].forEach(a=>V('jeep',a[0],a[1],a[2]));
+    [[23,0,H2],[-76,0,H2],[118,0,-H2],[200,0,-H2],[0,91,0],[0,-80,0],[0,-182,0]].forEach(a=>V('car',sc(a[0]),sc(a[1]),a[2]));
+    [[0,262,0],[0,-300,0],[330,0,-H2],[-300,0,H2]].forEach(a=>V('car',a[0],a[1],a[2]));
+    [[47,-2,H2],[-110,2,H2],[4,137,0],[-6,-118,0],[-225,2,H2],[2,245,0]].forEach(a=>V('bike',sc(a[0]),sc(a[1]),a[2]));
+    [[3,330,0],[-3,-340,0]].forEach(a=>V('bike',a[0],a[1],a[2]));
+    [[70,3,H2],[-35,-3,H2],[160,3,-H2],[-190,-3,H2],[3,-150,0],[-3,170,0],[3,50,0],[-3,-220,0]].forEach(a=>V('jeep',sc(a[0]),sc(a[1]),a[2]));
+    [[250,3,-H2],[-3,300,0],[3,-310,0]].forEach(a=>V('jeep',a[0],a[1],a[2]));
     TANKS.forEach(a=>V('tank',a[0],a[1],a[2]));
-    V('heli',PADS[0][0],PADS[0][1],Math.PI); V('heli',PADS[1][0],PADS[1][1],0); V('heli',60,205,0);
-    V('plane',RWX,-60,0); V('plane',RWX,-232,Math.PI); }
+    V('heli',PADS[0][0],PADS[0][1],Math.PI); V('heli',PADS[1][0],PADS[1][1],0); V('heli',HELI3[0],HELI3[1],0);
+    V('plane',RWX,-60*K,0); V('plane',RWX,-232*K,Math.PI); }
   BR.built=true;
 }
 
@@ -1706,14 +1733,14 @@ function startBR(){
   LOADOUT=[WBYID.nobet,EMPTY,EMPTY];
   gained=0; sessionUnlocks=[]; lvlQ=[]; lvlBusy=false; $('lvl').style.opacity=0; hudCache={};
   P=makeFighter('Sen','a',true,false); P.side='Sen'; P.css='#ece8d8'; P.vx=P.vz=P.vy=0; P.veh=null; P.air=true; P.sprint=false; P.gren=1; P.smk=1;
-  P.x=rnd(-60,60)*BRS; P.z=rnd(-60,60)*BRS; P.y=330; P.yaw=rnd(0,6.28); P.pitch=-0.45; P.canopy=makeCanopy(); scene.add(P.canopy);
+  P.x=rnd(-60,60)*BRS; P.z=rnd(-60,60)*BRS; P.y=420; P.yaw=rnd(0,6.28); P.pitch=-0.45; P.canopy=makeCanopy(); scene.add(P.canopy);
   P.style={camo:'woodland',vest:0x4a5a3a,helm:0x3f4a36,skin:0xc79b78,bal:false,pack:0x3b4030,col:0x888888};
   fighters.push(P);
   const names=BRNAMES.slice().sort(()=>Math.random()-0.5), kinds=['woodland','desert','urban','black','blue'];
   for(let i=0;i<15;i++){
     const st={camo:kinds[Math.floor(Math.random()*5)],vest:[0x4a5a3a,0x5a4a32,0x3a3d40,0x2e2f2e][i%4],helm:[0x3f4a36,0x6b5a3c,0x2d3033,0x1c1d1d][i%4],skin:SKINS[i%5],bal:Math.random()<0.2,pack:Math.random()<0.65?[0x3b4030,0x5a4a32,0x2d3033][i%3]:0,col:0x888888};
     const f=makeFighter(names[i],'a',false,false,st,randomWeapon()); f.side=names[i]; f.css=hslHex(i/15); f.air=true;
-    f.x=rnd(-90,90)*BRS; f.z=rnd(-90,90)*BRS; f.y=rnd(300,340); f.yaw=rnd(0,6.28); f.armor=Math.random()<0.4?25*(1+Math.floor(Math.random()*3)):0;
+    f.x=rnd(-90,90)*BRS; f.z=rnd(-90,90)*BRS; f.y=rnd(390,430); f.yaw=rnd(0,6.28); f.armor=Math.random()<0.4?25*(1+Math.floor(Math.random()*3)):0;
     const dd=BR.doors[Math.floor(Math.random()*BR.doors.length)], cxz=navXZ(navFree(navIdx(dd.x+rnd(-3,3),dd.z+rnd(-3,3)))); f.dropTx=cxz[0]; f.dropTz=cxz[1];
     f.canopy=makeCanopy(); f.mesh.add(f.canopy); fighters.push(f);
   }
@@ -1731,10 +1758,12 @@ function updateBR(dt){
   if(BR.endT>0){ BR.endT-=dt; if(BR.endT<=0) endBR(false); }
 }
 function drawRadarBR(){
-  const S=168,sc=S/300,cx=S/2,cy=S/2; rc.clearRect(0,0,S,S);
+  const S=168,sc=S/380,cx=S/2,cy=S/2; rc.clearRect(0,0,S,S);
   const w2s=(x,z)=>[cx+(x-P.x)*sc,cy+(z-P.z)*sc]; const Z=BR.zone;
   rc.lineWidth=1.6; rc.strokeStyle='#4aa3ff'; let p=w2s(Z.cx,Z.cz); rc.beginPath(); rc.arc(p[0],p[1],Z.r*sc,0,6.283); rc.stroke();
   rc.strokeStyle='rgba(255,255,255,.85)'; p=w2s(Z.tcx,Z.tcz); rc.beginPath(); rc.arc(p[0],p[1],Z.tr*sc,0,6.283); rc.stroke();
+  { const W=BR.waters; rc.fillStyle='rgba(60,130,190,.55)'; for(const r of W.rivers){ const a=w2s(r.x-r.hw,P.z-300),b=w2s(r.x+r.hw,P.z+300); rc.fillRect(a[0],a[1],b[0]-a[0],b[1]-a[1]); }
+    for(const l of W.lakes){ const q=w2s(l.x,l.z); rc.beginPath(); rc.arc(q[0],q[1],l.r*sc,0,6.283); rc.fill(); } }
   rc.fillStyle='rgba(150,154,144,.7)';
   for(const h of BR.houses){ const q=w2s(h.cx,h.cz); if(Math.abs(q[0]-cx)>S||Math.abs(q[1]-cy)>S)continue; rc.fillRect(q[0]-h.w*sc/2,q[1]-h.d*sc/2,h.w*sc,h.d*sc); }
   rc.fillStyle='#e8c24a'; for(const v of BR.vehicles){ if(v.occupied)continue; const q=w2s(v.x,v.z); rc.fillRect(q[0]-2,q[1]-2,4,4); }
@@ -1959,6 +1988,7 @@ function interact(){
   if(BR.nearVeh){ if(MP.play)mpSend({t:'venter',i:BR.nearVeh.idx,s:BR.nearVeh.occupied?1:0}); else enterVehicle(BR.nearVeh); }
 }
 function driveGround(v,dt){
+  if(inWater(v.x,v.z)){ v.speed*=Math.exp(-1.8*dt); if(v.speed>5)v.speed=5; else if(v.speed<-3)v.speed=-3; }
   const c=VCFG[v.type],th=(keys.KeyW?1:0)-(keys.KeyS?1:0),st=(keys.KeyA?1:0)-(keys.KeyD?1:0);
   if(th>0) v.speed+=(v.speed<0?c.brake:c.acc*(1-Math.max(0,v.speed)/c.max*0.85))*dt; else if(th<0) v.speed-=(v.speed>0?c.brake:c.acc*0.7)*dt;
   v.speed*=Math.exp(-(th===0?0.55:0.08)*dt); if(keys.Space)v.speed*=Math.exp(-3.2*dt);
@@ -2474,7 +2504,7 @@ function addRemote(pl){
     const i=pl.id, st={camo:BRKINDS[i%5],vest:[0x4a5a3a,0x5a4a32,0x3a3d40,0x2e2f2e][i%4],helm:[0x3f4a36,0x6b5a3c,0x2d3033,0x1c1d1d][i%4],skin:SKINS[i%5],bal:i%5===0,pack:i%3?[0x3b4030,0x5a4a32,0x2d3033][i%3]:0,col:0x888888};
     f=makeFighter(pl.name,'a',false,false,st,sim?randomWeapon():(MP.mode==='dm'?WBYID.alfa7:WBYID.nobet)); f.side='#'+pl.id; f.css=hslHex((i*0.17)%1);
     if(MP.mode==='br'){ f.air=true; f.canopy=makeCanopy(); f.mesh.add(f.canopy); }
-    if(sim&&MP.mode==='br'){ f.x=rnd(-90,90)*BRS; f.z=rnd(-90,90)*BRS; f.y=rnd(300,340); f.yaw=rnd(0,6.28);
+    if(sim&&MP.mode==='br'){ f.x=rnd(-90,90)*BRS; f.z=rnd(-90,90)*BRS; f.y=rnd(390,430); f.yaw=rnd(0,6.28);
       const dd=BR.doors[Math.floor(Math.random()*BR.doors.length)], cxz=navXZ(navFree(navIdx(dd.x+rnd(-3,3),dd.z+rnd(-3,3)))); f.dropTx=cxz[0]; f.dropTz=cxz[1]; }
   } else f=makeFighter(pl.name,pl.team,false,pl.team===me.team);
   f.remote=!sim; f.bot=!!pl.bot; f.id=pl.id; f.kills=pl.kills||0; f.deaths=pl.deaths||0; f.alive=pl.alive!==false; f.fresh=!sim; f.tx=f.x; f.ty=f.y; f.tz=f.z; f.tyaw=f.yaw; f.spd=0; f.wpId=f.wp.id;
@@ -2520,7 +2550,7 @@ function startMP(){
     if(!BR.built){ buildBRWorld(); setWorld('br'); buildNav(BR.half); createVehicles(); } else setWorld('br');
     mode='br'; BR.over=false; BR.endT=0; BR.place=0; BR.ts=1; LOADOUT=[WBYID.nobet,EMPTY,EMPTY];
     P=makeFighter(me.name,'a',true,false); P.side='#'+MP.id; P.css='#ece8d8'; P.vx=P.vz=P.vy=0; P.veh=null; P.air=true; P.sprint=false; P.gren=1; P.smk=1; P.id=MP.id; me.f=P;
-    P.x=rnd(-60,60)*BRS; P.z=rnd(-60,60)*BRS; P.y=330; P.yaw=rnd(0,6.28); P.pitch=-0.45; P.canopy=makeCanopy(); scene.add(P.canopy);
+    P.x=rnd(-60,60)*BRS; P.z=rnd(-60,60)*BRS; P.y=420; P.yaw=rnd(0,6.28); P.pitch=-0.45; P.canopy=makeCanopy(); scene.add(P.canopy);
     P.style={camo:'woodland',vest:0x4a5a3a,helm:0x3f4a36,skin:0xc79b78,bal:false,pack:0x3b4030,col:0x888888};
     fighters.push(P);
     for(const id in MP.players){ const pl=MP.players[id]; if(pl.id!==MP.id)addRemote(pl); }
