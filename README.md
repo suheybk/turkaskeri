@@ -85,4 +85,4 @@ yalnızca DoS'u kesiyor, hileyi kesmiyor.
 - **Tank:** top (patlayıcı mermi, alan hasarı), çarptığını ezer, fareyle namlu yönü.
 - **Makineli jip:** 2 kişilik. Çok oyunculuda ikinci oyuncu yolcu/nişancı olarak binip makineli tüfeği kullanır; sürücü inerse yolcu direksiyona geçer.
 - Helikopter ve uçak da ateş eder.
-- Terk edilmiş yüksek kuleler (dış spiral merdivenli, çatıda korkuluk ve keskin nişancı tüfeği) ve çok sık ormanlar var.
+- Terk edilmiş yüksek kuleler (içeriden spiral merdivenli (kapıdan girilir), çatıda korkuluk ve keskin nişancı tüfeği) ve çok sık ormanlar var.

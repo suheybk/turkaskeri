@@ -1511,25 +1511,28 @@ function buildBRWorld(){
       BR.stairs.push({x:sx,z:z0-0.6,dirz:1,top:n*SH,house:hi}); break;
     }
   });
-  // terk edilmiş yüksek kuleler: dış spiral merdiven + çatıda korkuluk (keskin nişancı yuvası)
+  // terk edilmiş yüksek kuleler: içeriden spiral merdiven (kapıdan girilir), çatıda açıklıktan çıkılır, korkuluk
   BR.towers=[];
   const tower=(cx,cz)=>{
-    const w=12,d=12,t=0.5,SH2=0.28,n=60,h=n*SH2,gap=2.6,x0=cx-w/2,x1=cx+w/2;
+    const w=12,d=12,t=0.5,SH2=0.28,n=54,h=n*SH2,gap=2.6,x0=cx-w/2,x1=cx+w/2;
     add(cx,cz+d/2,w,t,h,'bld');
     add((x0+cx-gap/2)/2,cz-d/2,(cx-gap/2)-x0,t,h,'bld'); add((cx+gap/2+x1)/2,cz-d/2,x1-(cx+gap/2),t,h,'bld'); add(cx,cz-d/2,gap,t,h-2.6,'bld',2.6);
     add(cx-w/2,cz,t,d-t,h,'bld'); add(cx+w/2,cz,t,d-t,h,'bld');
-    add(cx,cz,w+0.8,d+0.8,0.3,'roof',h-0.3); add(cx,cz,w-0.2,d-0.2,0.05,'floor',0,true);
-    // çatı korkuluğu (girişte boşluk)
-    add(cx,cz+6.3,12.8,0.3,1.0,'low',h); add(cx-6.3,cz,0.3,12.8,1.0,'low',h); add(cx-0.9,cz-6.3,11.0,0.3,1.0,'low',h); add(cx+6.3,cz+1.3,0.3,10.2,1.0,'low',h);
-    // dış spiral merdiven: güney kenar (doğuya), sonra doğu kenar (kuzeye)
-    const ax=w/2+1.4, az=d/2+1.4, per=n/2; let k=0;
-    const t0=(2*ax-1)/per; for(let j=0;j<per;j++){ k++; add(cx-ax+t0*(j+0.5),cz+az,t0,2.0,k*SH2,'low'); }
-    add(cx+ax,cz+az,2.0,2.0,k*SH2,'low'); // köşe sahanlığı
-    const t1=(2*az-1)/per; for(let j=0;j<per;j++){ k++; add(cx+ax,cz+az-1-t1*(j+0.5),2.0,t1,k*SH2,'low'); }
-    add(cx+5.7,cz-7.4,1.4,2.0,0.3,'roof',h-0.3); // çatıya geçiş
+    const rf=(a0,a1,b0,b1)=>add(cx+(a0+a1)/2,cz+(b0+b1)/2,a1-a0,b1-b0,0.3,'roof',h-0.3);
+    rf(-6.4,1.4,-6.4,6.4); rf(1.4,3.75,-3.75,-1.8); rf(1.4,6.4,-1.8,6.4); // kuzeydoğuda merdiven açıklığı
+    add(cx,cz,w-0.2,d-0.2,0.05,'floor',0,true);
+    add(cx,cz+6.3,12.8,0.3,1.0,'low',h); add(cx,cz-6.3,12.8,0.3,1.0,'low',h); add(cx-6.3,cz,0.3,12.8,1.0,'low',h); add(cx+6.3,cz,0.3,12.8,1.0,'low',h);
+    let k=0;
+    const run=(x,z,dx,dz,len,cnt)=>{ const tr=len/cnt; for(let j=0;j<cnt;j++){ k++; const px=x+dx*tr*(j+0.5), pz=z+dz*tr*(j+0.5); add(cx+px,cz+pz,dx?tr:2.0,dx?2.0:tr,k*SH2,'low'); } };
+    const land=(x,z)=>add(cx+x,cz+z,2.0,2.0,k*SH2,'low');
+    run(-2.0,-4.75,-1,0,1.75,4); land(-4.75,-4.75);
+    run(-4.75,-3.75,0,1,7.5,15); land(-4.75,4.75);
+    run(-3.75,4.75,1,0,7.5,15); land(4.75,4.75);
+    run(4.75,3.75,0,-1,7.5,15); land(4.75,-4.75);
+    run(3.75,-4.75,-1,0,2.25,5);
     BR.houses.push({cx,cz,w,d,h}); BR.doors.push({x:cx,z:cz-d/2-2.2}); BR.towers.push({cx,cz,h});
-    for(let i=0;i<3;i++) BR.spots.push({x:cx+rr(-4,4),z:cz+rr(-4,4)});
-    BR.spots.push({x:cx-2.5,z:cz+1,y:h,sn:1}); BR.spots.push({x:cx+1.5,z:cz+2.5,y:h});
+    for(let i=0;i<3;i++) BR.spots.push({x:cx+rr(-2.5,2.5),z:cz+rr(-2.5,2.5)});
+    BR.spots.push({x:cx-2.5,z:cz+1,y:h,sn:1}); BR.spots.push({x:cx+2.5,z:cz+2.5,y:h});
   };
   { const T=[[-120,-100],[110,110],[-200,60],[180,-20],[20,-190],[-30,200],[-130,150],[130,-190],[230,170],[-240,-170],[60,70],[-50,-40]]; let placed=0;
     for(const tp of T){ for(let q=0;q<14;q++){ const cx=tp[0]+rr(-30,30), cz=tp[1]+rr(-30,30); if(Math.abs(cx)>H-26||Math.abs(cz)>H-26)continue;
