@@ -91,3 +91,7 @@ yalnızca DoS'u kesiyor, hileyi kesmiyor.
 ### Uçaktan atlama ve büyük harita
 - Battle Royale artık taşıma uçağıyla başlar: uçak haritayı boydan boya geçer, **Space / E** (mobilde zıpla) ile atlanır; botlar hedef kapılarına yaklaşınca atlar, uçak çıkışa varınca herkes düşer.
 - Harita 960 m x 960 m (BRS=3.2, yarı boyut 480); çember evreleri ve radar buna göre ölçeklendi.
+
+### Takım savaşı haritaları
+- 5 harita: Üs (orijinal), Depo, Köy, Rafineri, Geçit. Menüden seçilir ya da "Rastgele"; çok oyunculuda harita oda tohumundan (seed) belirlenir, herkeste aynıdır.
+- Yeni haritaların bot yol noktaları otomatik üretilir (ızgara + görüş hattı).

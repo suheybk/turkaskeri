@@ -94,6 +94,9 @@ body.playing #hud{display:block}
 #menu h1{font-size:clamp(46px,9vw,104px);line-height:.95;letter-spacing:.01em}
 #menu .sub{margin-top:10px;font-size:22px;font-weight:600;color:rgba(236,232,216,.7)}
 .teams{display:flex;gap:16px;margin-top:34px;flex-wrap:wrap;justify-content:center}
+.mapsel,#mapsel{pointer-events:auto;display:flex;gap:6px;justify-content:center;margin:10px 0 4px;flex-wrap:wrap}
+#mapsel button{background:rgba(20,24,20,.7);color:var(--bone);border:1px solid #5d6455;padding:5px 12px;font:inherit;font-size:14px;cursor:pointer;letter-spacing:.04em}
+#mapsel button.on{background:#7fb35f;color:#10140e;border-color:#9bd07a}
 .team{pointer-events:auto;cursor:pointer;width:290px;padding:18px 20px 20px;text-align:left;color:var(--bone);
   background:var(--smoke);border:0;border-left:8px solid;font-family:inherit}
 .team:hover,.team:focus-visible{background:#363937;outline:2px solid var(--bone);outline-offset:2px}
@@ -370,6 +373,7 @@ body.touch.useok #tuse{display:flex}
   <p class="sub">Terk edilmiş askerî tesiste 4’e 4 takım savaşı</p>
   <div id="lvlstrip"><span id="lvltxt">Seviye 1</span><div class="bar"><i id="lvlbar"></i></div><span id="xptxt"></span></div>
   <button class="gearbtn" id="gearbtn">Teçhizat<em id="newtag" style="display:none">Yeni silah</em></button>
+  <div id="mapsel"></div>
   <div class="teams">
     <button class="team a" data-team="a"><b class="stencil">Alfa</b><span>Dengeli piyade. 100 can, standart hız.</span></button>
     <button class="team o" data-team="o"><b class="stencil">Özel Harekât</b><span>Çevik ve hafif. 90 can, biraz daha hızlı.</span></button>
@@ -433,12 +437,15 @@ const BASE=[
   [-14,10,3,3,3.2,'tank']
 ];
 const BOXES=[];
-(function(){
-  const add=(cx,cz,w,d,h,kind)=>BOXES.push({cx,cz,w,d,h,kind,minx:cx-w/2,maxx:cx+w/2,minz:cz-d/2,maxz:cz+d/2,miny:0,maxy:h});
-  for(const b of BASE){ add(b[0],b[1],b[2],b[3],b[4],b[5]); add(-b[0],-b[1],b[2],b[3],b[4],b[5]); }
+function mapBoxes(base){
+  const out=[], add=(cx,cz,w,d,h,kind)=>out.push({cx,cz,w,d,h,kind,minx:cx-w/2,maxx:cx+w/2,minz:cz-d/2,maxz:cz+d/2,miny:0,maxy:h});
+  for(const b of base){ add(b[0],b[1],b[2],b[3],b[4],b[5]); add(-b[0],-b[1],b[2],b[3],b[4],b[5]); }
   add(0,0,3,3,2.4,'crate');
   add(0,-40.5,82,1,7,'wall'); add(0,40.5,82,1,7,'wall'); add(-40.5,0,1,82,7,'wall'); add(40.5,0,1,82,7,'wall');
-})();
+  return out;
+}
+function setBoxes(a){ BOXES.length=0; for(let i=0;i<a.length;i++)BOXES.push(a[i]); }
+setBoxes(mapBoxes(BASE));
 
 function raySlab(ox,oy,oz,dx,dy,dz,b,maxT){
   let t0=0,t1=maxT,a,c,t;
@@ -480,24 +487,47 @@ function canSee(ax,ay,az,bx,by,bz){
 const WP_N=[[0,-32],[-14,-32],[14,-32],[-24,-31],[24,-31],[-36,-30],[-37.5,-21],[-33,-15],[-35.5,-8],[-35,-1.5],
   [-25,0],[-14,0],[-8,0],[0,-5],[-9,-9],[9,-9],[-12,-14],[-12,-20],[-8,-18],[0,-16],[0,-24],[10,-16],[14,-20],[-8,-26],
   [-25,-17],[-25,-24],[25,-17],[25,-24],[36,-30],[36,-22],[33,-14],[35.5,-8],[35,-1.5],[25,0],[14,-14],[-20,-10]];
+const MAPS=[
+  {name:'Üs',fog:0x8e988f,tint:0xffffff,base:BASE,wp:WP_N},
+  {name:'Depo',fog:0x7f8a96,tint:0xb4c0d4,base:[
+    [-30,-31,6,2.4,2.8,'cont'],[-22,-27,6,2.4,2.8,'cont'],[-34,-23,2.4,6,2.8,'cont'],[-24,-18,6,2.4,2.8,'cont'],[-14,-22,2.4,6,2.8,'cont'],
+    [-8,-28,6,2.4,2.8,'cont'],[-30,-12,6,2.4,2.8,'cont'],[-20,-9,2.4,6,2.8,'cont'],[-12,-14,6,2.4,2.8,'cont'],[-4,-18,2.4,6,2.8,'cont'],
+    [6,-24,6,2.4,2.8,'cont'],[10,-14,2.4,6,2.8,'cont'],[18,-20,6,2.4,2.8,'cont'],[22,-30,2.4,6,2.8,'cont'],
+    [0,-6,10,4,4.5,'hangar'],[-8,-8,1.6,1.6,1.2,'crate'],[2,-12,1.6,1.6,1.2,'crate'],[16,-8,1.6,1.6,1.2,'crate'],[26,-10,5,1,1.2,'low']]},
+  {name:'Köy',fog:0xb9a98a,tint:0xe3cf9c,base:[
+    [-30,-28,9,7,4.5,'bld'],[-18,-27,7,6,4.5,'bld'],[-6,-25,6,5,4.5,'bld'],[8,-27,8,6,4.5,'bld'],[24,-29,8,7,4.5,'bld'],[34,-20,6,9,4.5,'bld'],
+    [-33,-14,6,8,4.5,'bld'],[-20,-15,8,6,4.5,'bld'],[-8,-14,5,7,4.5,'bld'],[10,-14,7,6,4.5,'bld'],[22,-14,6,7,4.5,'bld'],
+    [-30,-3,7,6,4.5,'bld'],[-17,-2,5,5,4.5,'bld'],[-12,-5.5,1.6,1.6,1.2,'crate'],[14,-4,1.6,1.6,1.2,'crate'],[4,-9,1.6,1.6,1.2,'crate'],
+    [-24,-8,6,1,1.2,'low'],[26,-6,1,5,1.2,'low'],[0,-4,6,1,1.2,'low']]},
+  {name:'Rafineri',fog:0x77706a,tint:0x8f8a84,base:[
+    [-28,-27,7,7,6.5,'tank'],[-28,-13,7,7,6.5,'tank'],[-12,-22,6,6,6,'tank'],[14,-26,7,7,6.5,'tank'],[28,-18,6,6,6,'tank'],[6,-10,6,6,6,'tank'],
+    [-18,-5,14,1,1.2,'low'],[18,-6,1,10,1.2,'low'],[0,-17,10,1,1.2,'low'],[-35,-3,1,8,1.2,'low'],[-4,-26,2.4,6,2.8,'cont'],
+    [-17,-31,2,2,1.2,'crate'],[20,-8,1.6,1.6,1.2,'crate']]},
+  {name:'Geçit',fog:0xc4a57a,tint:0xe6c892,base:[
+    [-31,-10,14,12,6,'bld'],[-33,-27,10,8,5,'bld'],[20,-28,8,8,5,'bld'],[-14,-18,5,1,1.2,'low'],[-8,-6,1,5,1.2,'low'],[10,-20,5,1,1.2,'low'],[22,-12,1,6,1.2,'low'],
+    [4,-8,1.6,1.6,1.2,'crate'],[14,-6,1.6,1.6,1.2,'crate'],[-18,-2,1.6,1.6,1.2,'crate'],[-4,-26,6,2.4,2.8,'cont'],[10,-27,6,2.4,2.8,'cont'],
+    [-18,-27,3,3,3.2,'tank'],[0,-14,10,3,4.5,'hangar'],[24,-6,4,4,3,'tank']]}
+];
 const NODES=[];
-(function(){
-  const cand=[]; for(const p of WP_N){ cand.push([p[0],p[1]]); cand.push([-p[0],-p[1]]); }
-  const seen={}; const ok=[];
-  for(const p of cand){ const k=p[0]+','+p[1]; if(seen[k])continue; seen[k]=1; if(!blockedAt(p[0],p[1],0.6,0)) ok.push({x:p[0],z:p[1]}); }
-  // bağlantılar
+function buildNodes(map){
+  NODES.length=0;
+  const cand=[];
+  if(map.wp){ for(const p of map.wp){ cand.push([p[0],p[1]]); cand.push([-p[0],-p[1]]); } }
+  else for(let x=-37;x<=37;x+=5)for(let z=-37;z<=37;z+=5) cand.push([x,z]);
+  const seen={}; const ok=[], lim=map.wp?26:7.6, mg=map.wp?0.6:0.95;
+  for(const p of cand){ const k=p[0]+','+p[1]; if(seen[k])continue; seen[k]=1; if(!blockedAt(p[0],p[1],mg,0)) ok.push({x:p[0],z:p[1]}); }
   const adj=ok.map(()=>[]);
   for(let i=0;i<ok.length;i++)for(let j=i+1;j<ok.length;j++){
     const d=Math.hypot(ok[i].x-ok[j].x,ok[i].z-ok[j].z);
-    if(d<=26 && segClear(ok[i].x,ok[i].z,ok[j].x,ok[j].z,0.55)){ adj[i].push([j,d]); adj[j].push([i,d]); } }
-  // ana bileşeni al
+    if(d<=lim && segClear(ok[i].x,ok[i].z,ok[j].x,ok[j].z,0.55)){ adj[i].push([j,d]); adj[j].push([i,d]); } }
   const comp=new Array(ok.length).fill(-1); let best=[],cid=0;
   for(let s=0;s<ok.length;s++){ if(comp[s]>=0)continue; const st=[s]; comp[s]=cid; const mem=[s];
     while(st.length){ const u=st.pop(); for(const e of adj[u]) if(comp[e[0]]<0){comp[e[0]]=cid;st.push(e[0]);mem.push(e[0]);} }
     if(mem.length>best.length)best=mem; cid++; }
   const remap={}; best.forEach((old,ni)=>{remap[old]=ni; NODES.push({x:ok[old].x,z:ok[old].z,adj:[]});});
   best.forEach(old=>{ for(const e of adj[old]) if(remap[e[0]]!==undefined) NODES[remap[old]].adj.push([remap[e[0]],e[1]]); });
-})();
+}
+buildNodes(MAPS[0]);
 function nearestNode(x,z,needVisible){
   let bi=-1,bd=1e9;
   for(let i=0;i<NODES.length;i++){ const d=Math.hypot(NODES[i].x-x,NODES[i].z-z);
@@ -574,6 +604,13 @@ function navPath(x0,z0,x1,z1){
 //#LOGIC_END
 
 const BOX_TDM=BOXES.slice();
+let TM=MAPS[0];
+function setTDMMap(i){
+  TM=MAPS[((i|0)%MAPS.length+MAPS.length)%MAPS.length]; const saved=BOXES.slice();
+  BOX_TDM.length=0; for(const b of mapBoxes(TM.base))BOX_TDM.push(b);
+  setBoxes(BOX_TDM); buildNodes(TM); setBoxes(mode==='tdm'?BOX_TDM:saved);
+  if(typeof buildWorldMesh==='function')buildWorldMesh();
+}
 /* ---------- Yardımcılar ---------- */
 const $=id=>document.getElementById(id);
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
@@ -718,8 +755,9 @@ function scaleUV(geo,w,h,d,tile){
 
 const worldTDM=new THREE.Group(); scene.add(worldTDM); scene.add(sun.target);
 /* ---------- Zemin ve yapılar ---------- */
-(function buildWorld(){
-  const fl=new THREE.Mesh(new THREE.PlaneGeometry(84,84),new THREE.MeshStandardMaterial({map:TEX.floor,roughness:1}));
+function buildWorldMesh(){
+  while(worldTDM.children.length){ const o=worldTDM.children[0]; worldTDM.remove(o); if(o.geometry)o.geometry.dispose(); if(o.material)o.material.dispose(); }
+  const fl=new THREE.Mesh(new THREE.PlaneGeometry(84,84),new THREE.MeshStandardMaterial({map:TEX.floor,roughness:1,color:TM.tint}));
   fl.rotation.x=-Math.PI/2; fl.receiveShadow=true; worldTDM.add(fl);
   // spawn alanları
   function pad(z,col){
@@ -733,7 +771,7 @@ const worldTDM=new THREE.Group(); scene.add(worldTDM); scene.add(sun.target);
   const mk=new THREE.Mesh(new THREE.RingGeometry(5.2,5.45,48),new THREE.MeshBasicMaterial({color:0xd8cf9a,transparent:true,opacity:.35,depthWrite:false,side:THREE.DoubleSide}));
   mk.rotation.x=-Math.PI/2; mk.position.y=0.03; worldTDM.add(mk);
   let ci=0;
-  for(const b of BOXES){
+  for(const b of BOX_TDM){
     const geo=new THREE.BoxGeometry(b.w,b.h,b.d);
     let tex,tile=4,rough=0.95,metal=0;
     switch(b.kind){
@@ -749,7 +787,8 @@ const worldTDM=new THREE.Group(); scene.add(worldTDM); scene.add(sun.target);
     const m=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({map:tex,roughness:rough,metalness:metal}));
     m.position.set(b.cx,b.h/2,b.cz); m.castShadow=b.kind!=='wall'; m.receiveShadow=true; worldTDM.add(m);
   }
-})();
+}
+buildWorldMesh();
 
 /* ---------- Ses ---------- */
 let ac=null,noiseBuf=null;
@@ -1417,6 +1456,11 @@ const skyMesh=(function(){
   m.renderOrder=-100; m.frustumCulled=false; scene.add(m); return m;
 })();
 
+function tintSky(fc){
+  const pos=skyMesh.geometry.attributes.position, col=skyMesh.geometry.attributes.color, top=new THREE.Color(0x5f8fc2), hor=new THREE.Color(fc), c=new THREE.Color();
+  for(let i=0;i<pos.count;i++){ const y=pos.getY(i)/150, t=Math.pow(Math.max(0,y),0.55); c.copy(hor).lerp(top,t); col.setXYZ(i,c.r,c.g,c.b); }
+  col.needsUpdate=true;
+}
 /* ---------- Battle Royale dünyası ---------- */
 const BRS=3.2;
 const BR={built:false,half:480,plane:null,boxes:[],doors:[],houses:[],spots:[],items:[],grp:null,zone:null,alive:0,over:false,endT:0,place:0,vehSpawns:[],vehicles:[],zoneMesh:null};
@@ -1434,6 +1478,7 @@ function setWorld(m){
   scene.fog.near=m==='br'?110:28; scene.fog.far=m==='br'?330:115;
   camera.near=m==='br'?0.1:0.05; camera.far=m==='br'?1200:220; if(BR.plane&&BR.plane.mesh&&m!=='br')BR.plane.mesh.visible=false; camera.updateProjectionMatrix();
   document.body.classList.toggle('br',m==='br');
+  try{ const fc=m==='br'?FOG:TM.fog; scene.background.setHex(fc); scene.fog.color.setHex(fc); tintSky(fc); }catch(e){}
 }
 
 function buildBRWorld(){
@@ -2268,7 +2313,7 @@ $('greset').addEventListener('click',()=>{ prof={xp:0,level:1,seen:1,loadout:DEF
 /* ---------- Oyun akışı ---------- */
 function clearBots(){ for(const f of fighters){ if(f.mesh)scene.remove(f.mesh); if(f.canopy&&f.canopy.parent)f.canopy.parent.remove(f.canopy); } fighters.length=0; if(P&&P.canopy)scene.remove(P.canopy); if(typeof clearBRThings==='function')clearBRThings(); clearProjs(); }
 function startGame(teamKey){
-  BR.dm=false; initAudio(); clearBots(); setWorld('tdm'); if(BR.zoneMesh)BR.zoneMesh.visible=false; applyLoadout(); gained=0; sessionUnlocks=[]; lvlQ=[]; lvlBusy=false; $('lvl').style.opacity=0;
+  BR.dm=false; initAudio(); clearBots(); setTDMMap(soloMap<0?Math.floor(Math.random()*MAPS.length):soloMap); setWorld('tdm'); if(BR.zoneMesh)BR.zoneMesh.visible=false; applyLoadout(); gained=0; sessionUnlocks=[]; lvlQ=[]; lvlBusy=false; $('lvl').style.opacity=0;
   const en=teamKey==='a'?'o':'a';
   score.a=0; score.o=0; timeLeft=MATCH_TIME; hudCache={};
   P=makeFighter('Sen',teamKey,true,false); P.vx=P.vz=P.vy=0; fighters.push(P);
@@ -2278,7 +2323,7 @@ function startGame(teamKey){
   buildViewmodels(teamKey); resetAmmo();
   for(const f of fighters) respawn(f);
   $('feed').innerHTML=''; $('dead').style.display='none'; $('hint').style.display='none';
-  updateScoreHud(); $('prompt').style.display='none'; $('vinfo').style.display='none'; $('goal').textContent='İlk 30 öldürmeye ulaşan kazanır'; $('sa').textContent='Alfa 0'; $('so').textContent='0 Özel Harekât'; state='play'; paused=false; fallback=false; document.body.classList.remove('nolock'); P.pitch=0;
+  updateScoreHud(); $('prompt').style.display='none'; $('vinfo').style.display='none'; $('goal').textContent='İlk 30 öldürmeye ulaşan kazanır   |   Harita: '+TM.name; $('sa').textContent='Alfa 0'; $('so').textContent='0 Özel Harekât'; state='play'; paused=false; fallback=false; document.body.classList.remove('nolock'); P.pitch=0;
   document.body.classList.add('playing'); $('menu').classList.remove('on'); $('end').classList.remove('on'); $('pause').classList.remove('on');
   lockPointer();
 }
@@ -2317,6 +2362,9 @@ document.addEventListener('pointerlockchange',()=>{
 });
 document.addEventListener('pointerlockerror',()=>{});
 $('pause').addEventListener('click',()=>{ if(state==='play'){ if(fallback||IS_TOUCH_EARLY){paused=false;$('pause').classList.remove('on');} else lockPointer(); } });
+let soloMap=-1;
+(function(){ const el=$('mapsel'); const names=['Rastgele'].concat(MAPS.map(m=>m.name));
+  names.forEach((n,i)=>{ const b=document.createElement('button'); b.textContent=n; b.className=i===0?'on':''; b.addEventListener('click',()=>{ soloMap=i-1; for(const c of el.children)c.classList.remove('on'); b.classList.add('on'); }); el.appendChild(b); }); })();
 document.querySelectorAll('.team').forEach(b=>b.addEventListener('click',()=>startGame(b.dataset.team)));
 $('again').addEventListener('click',()=>{ $('end').classList.remove('on'); if(MP.ws){ showLobby(); return; } $('again').textContent='Menüye dön'; $('menu').classList.add('on'); state='menu'; setWorld('tdm'); if(BR.zoneMesh)BR.zoneMesh.visible=false; refreshMenuLevel(); });
 $('brbtn').addEventListener('click',startBR);
@@ -2608,12 +2656,12 @@ function startMP(){
     resetVehicles(); buildViewmodels('a'); resetAmmo(); cur=0; selectWeapon(0,true);
     $('goal').textContent=''; $('sa').textContent='Hayatta '+BR.alive;
   }else{
-    setWorld('tdm'); if(BR.zoneMesh)BR.zoneMesh.visible=false; applyLoadout();
+    setTDMMap((MP.seed>>>0)%MAPS.length); setWorld('tdm'); if(BR.zoneMesh)BR.zoneMesh.visible=false; applyLoadout();
     score.a=MP.score.a; score.o=MP.score.o; timeLeft=MP.left;
     P=makeFighter(me.name,me.team,true,false); P.vx=P.vz=P.vy=0; P.id=MP.id; me.f=P; fighters.push(P);
     for(const id in MP.players){ const pl=MP.players[id]; if(pl.id!==MP.id)addRemote(pl); }
     buildViewmodels(me.team); resetAmmo(); respawn(P);
-    updateScoreHud(); $('goal').textContent='İlk 30 öldürmeye ulaşan kazanır';
+    updateScoreHud(); $('goal').textContent='İlk 30 öldürmeye ulaşan kazanır   |   Harita: '+TM.name;
   }
   $('feed').innerHTML=''; $('dead').style.display='none'; $('hint').style.display='none'; $('prompt').style.display='none'; $('vinfo').style.display='none';
   MP.play=true; MP.wasPlaying=true; MP.sendT=0; state='play'; paused=false; fallback=false; document.body.classList.remove('nolock'); if(!br&&!dm)P.pitch=0;
@@ -2797,7 +2845,7 @@ function frame(t){
   renderer.render(scene,camera);
 }
 buildViewmodels('a'); refreshMenuLevel();
-window.__TA={ground:(x,z,r,y)=>groundAt(x,z,r,y),blocked:(x,z,r,y)=>blockedAt(x,z,r,y),BOXES,get MP(){return MP;},mpMsg,get mode(){return mode;},addXP,get prof(){return prof;},WEAP,DBG,fighters,get P(){return P;},scene,camera,BR};
+window.__TA={setTDMMap,NODES,nearestNode,findPath,ground:(x,z,r,y)=>groundAt(x,z,r,y),blocked:(x,z,r,y)=>blockedAt(x,z,r,y),BOXES,get MP(){return MP;},mpMsg,get mode(){return mode;},addXP,get prof(){return prof;},WEAP,DBG,fighters,get P(){return P;},scene,camera,BR};
 requestAnimationFrame(frame);
 })();
 </script>
