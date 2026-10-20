@@ -87,3 +87,7 @@ yalnızca DoS'u kesiyor, hileyi kesmiyor.
 - Helikopter ve uçak da ateş eder.
 - 4 sığ dere (bele kadar, yürünerek girilir) göllere ve nehre bağlanır.
 - Terk edilmiş yüksek kuleler (içeriden spiral merdivenli (kapıdan girilir), çatıda korkuluk ve keskin nişancı tüfeği) ve çok sık ormanlar var.
+
+### Uçaktan atlama ve büyük harita
+- Battle Royale artık taşıma uçağıyla başlar: uçak haritayı boydan boya geçer, **Space / E** (mobilde zıpla) ile atlanır; botlar hedef kapılarına yaklaşınca atlar, uçak çıkışa varınca herkes düşer.
+- Harita 960 m x 960 m (BRS=3.2, yarı boyut 480); çember evreleri ve radar buna göre ölçeklendi.
