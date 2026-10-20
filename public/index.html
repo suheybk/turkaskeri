@@ -222,7 +222,7 @@ body.touch .keys,body.touch .soon{display:none}
 body.touch.inveh .wonly{display:none}
 body.touch.inair .wonly{display:none}
 body.touch.invair #tdown,body.touch.inair #tdown{display:flex}
-body.touch.invair #tfire{display:flex}
+body.touch.inarmed #tfire{display:flex}
 body.touch.useok #tuse{display:flex}
 #rotate{position:fixed;inset:0;z-index:50;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#0f1210;font-size:26px;font-weight:700;text-align:center;padding:30px}
 #rotate b{font-size:64px;display:block;animation:rot 1.8s ease-in-out infinite}
@@ -546,13 +546,14 @@ function navLos(x0,z0,x1,z1){
 }
 function navPath(x0,z0,x1,z1){
   const n=NAV.n,N=n*n,s=navFree(navIdx(x0,z0)),g=navFree(navIdx(x1,z1)); if(s<0||g<0)return null;
-  const gs=new Float32Array(N).fill(1e9),came=new Int32Array(N).fill(-1),closed=new Uint8Array(N),hx=[],hv=[];
+  if(!NAV.gs||NAV.gs.length!==N){ NAV.gs=new Float32Array(N); NAV.came=new Int32Array(N); NAV.closed=new Uint8Array(N); }
+  const gs=NAV.gs.fill(1e9),came=NAV.came.fill(-1),closed=NAV.closed.fill(0),hx=[],hv=[];
   const push=(i,f)=>{ let k=hx.length; hx.push(i); hv.push(f); while(k>0){ const p=(k-1)>>1; if(hv[p]<=hv[k])break; let t=hv[p];hv[p]=hv[k];hv[k]=t; t=hx[p];hx[p]=hx[k];hx[k]=t; k=p; } };
   const pop=()=>{ const top=hx[0],li=hx.pop(),lv=hv.pop(); if(hx.length){ hx[0]=li;hv[0]=lv; let k=0;
     for(;;){ const l=2*k+1,r=l+1; let m=k; if(l<hx.length&&hv[l]<hv[m])m=l; if(r<hx.length&&hv[r]<hv[m])m=r; if(m===k)break; let t=hv[m];hv[m]=hv[k];hv[k]=t; t=hx[m];hx[m]=hx[k];hx[k]=t; k=m; } } return top; };
   const gx1=g%n,gz1=(g/n)|0, hh=i=>{ const dx=Math.abs((i%n)-gx1),dz=Math.abs(((i/n)|0)-gz1); return dx+dz-0.586*Math.min(dx,dz); };
   gs[s]=0; push(s,hh(s)); let it=0,found=false;
-  while(hx.length&&it++<16000){
+  while(hx.length&&it++<45000){
     const u=pop(); if(closed[u])continue; closed[u]=1; if(u===g){found=true;break;}
     const ux=u%n,uz=(u/n)|0;
     for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++){
@@ -981,7 +982,7 @@ function makeFighter(name,teamKey,isPlayer,friendly,style,wp){
 function dmSpawnPoint(f){
   let bx=0,bz=0,bs=-1;
   for(let k=0;k<14;k++){
-    const x=rnd(-130,130),z=rnd(-130,130); if(blockedAt(x,z,0.7,0))continue;
+    const rr_=Math.sqrt(Math.random())*(BR.dm?140:BR.half-25),aa=Math.random()*6.283,x=Math.cos(aa)*rr_,z=Math.sin(aa)*rr_; if(blockedAt(x,z,0.7,0))continue;
     let md=1e9; for(const o of fighters){ if(o===f||!o.alive)continue; md=Math.min(md,Math.hypot(o.x-x,o.z-z)); }
     if(md>bs){ bs=md; bx=x; bz=z; }
   }
@@ -1100,21 +1101,45 @@ function playerShoot(){
   sndShot(n>1?0.42:0.32,w.pitch); P.firedT=1.2;
   if(ammo[cur]<=0) startReload();
 }
+function boomFx(x,y,z){
+  burst(x,y+0.3,z,0xffa030,24,10); burst(x,y+0.3,z,0x4a4a4a,14,5);
+  const fm=new THREE.Mesh(new THREE.SphereGeometry(1,10,8),new THREE.MeshBasicMaterial({color:0xffb040,transparent:true,opacity:0.8,blending:THREE.AdditiveBlending,depthWrite:false}));
+  fm.position.set(x,y+0.4,z); scene.add(fm); booms.push({m:fm,t:0});
+}
+function explodeAt(x,y,z,owner,rad,dmg){
+  boomFx(x,y,z); sndShot(0.9,260);
+  for(const f of fighters){
+    if(!f.alive||f.air||f===owner||f.side===owner.side)continue;
+    const d=Math.hypot(f.x-x,f.y+1-y,f.z-z); if(d>rad)continue;
+    if(d>2.2&&!canSee(x,y+0.4,z,f.x,f.y+1,f.z))continue;
+    damage(f,dmg*(1-d/rad),owner,false);
+  }
+}
 function vehShoot(){
-  const v=P.veh; fireCd=1/11;
+  const v=P.veh, ty=v.type;
   camera.updateMatrixWorld();
-  const d0=new THREE.Vector3(); camera.getWorldDirection(d0);
-  const fw=new THREE.Vector3(-Math.sin(v.yaw),0,-Math.cos(v.yaw));
-  const side=(vehGunSide=-vehGunSide)*1.1, rx=Math.cos(v.yaw)*side, rz=-Math.sin(v.yaw)*side;
-  const ox=v.x+fw.x*3+rx, oy=v.y+0.9, oz=v.z+fw.z*3+rz;
-  const d=d0.clone(); d.x+=rnd(-0.012,0.012); d.y+=rnd(-0.012,0.012); d.z+=rnd(-0.012,0.012); d.normalize();
-  const r=trace(ox,oy,oz,d.x,d.y,d.z,260,P.side);
+  const co=new THREE.Vector3(),d0=new THREE.Vector3(); camera.getWorldPosition(co); camera.getWorldDirection(d0);
+  const ang=v.yaw+P.yaw, thx=-Math.sin(ang), thz=-Math.cos(ang);
+  const rc=trace(co.x,co.y,co.z,d0.x,d0.y,d0.z,300,P.side); let at=Math.max(rc.t,12);
+  if(d0.y<-1e-4){ const tg=-co.y/d0.y; if(tg>0&&tg<at)at=tg; }
+  const Tx=co.x+d0.x*at,Ty=co.y+d0.y*at,Tz=co.z+d0.z*at;
+  let ox,oy,oz,dmg,spr;
+  if(ty==='tank'){ ox=v.x+thx*4; oy=v.y+2.3; oz=v.z+thz*4; fireCd=1.7; spr=0.004; }
+  else if(ty==='jeep'){ ox=v.x+thx*0.9; oy=v.y+2.0; oz=v.z+thz*0.9; fireCd=1/12; dmg=20; spr=0.014; }
+  else{ const fw={x:-Math.sin(v.yaw),z:-Math.cos(v.yaw)}; const side=(vehGunSide=-vehGunSide)*1.1; ox=v.x+fw.x*3+Math.cos(v.yaw)*side; oy=v.y+0.9; oz=v.z+fw.z*3-Math.sin(v.yaw)*side; fireCd=1/11; dmg=22; spr=0.012; }
+  const d=new THREE.Vector3(Tx-ox,Ty-oy,Tz-oz).normalize(); d.x+=rnd(-spr,spr); d.y+=rnd(-spr,spr); d.z+=rnd(-spr,spr); d.normalize();
+  const r=trace(ox,oy,oz,d.x,d.y,d.z,300,P.side); let gh=false;
+  if(d.y<-1e-4){ const tg=-oy/d.y; if(tg>0&&tg<r.t){ r.t=tg; r.f=null; gh=true; } }
   const ex=ox+d.x*r.t,ey=oy+d.y*r.t,ez=oz+d.z*r.t;
   tracer(ox,oy,oz,ex,ey,ez);
-  if(MP.play) mpSend({t:'sh',ax:+ox.toFixed(2),ay:+oy.toFixed(2),az:+oz.toFixed(2),bx:+ex.toFixed(2),by:+ey.toFixed(2),bz:+ez.toFixed(2),w:LOADOUT[cur].id});
-  if(r.f){ burst(ex,ey,ez,0x9b1f18,4,2.6); damage(r.f,22*(r.head?1.5:1),P,r.head); }
-  else if(r.t<260) burst(ex,ey,ez,0xb9b7aa,3,2.2);
-  sndShot(0.3,0.7); P.firedT=1.2;
+  if(MP.play) mpSend({t:'sh',ax:+ox.toFixed(2),ay:+oy.toFixed(2),az:+oz.toFixed(2),bx:+ex.toFixed(2),by:+ey.toFixed(2),bz:+ez.toFixed(2),w:LOADOUT[cur].id,bm:ty==='tank'?1:0});
+  if(ty==='tank'){ if(r.t<300){ if(r.f)damage(r.f,60,P,false); explodeAt(ex,ey,ez,P,8,170); } sndShot(0.9,180); recoil+=0.05; }
+  else{
+    if(r.f){ burst(ex,ey,ez,0x9b1f18,4,2.6); damage(r.f,dmg*(r.head?1.5:1),P,r.head); }
+    else if(r.t<300) burst(ex,ey,ez,gh?0x8a7a55:0xb9b7aa,3,2.2);
+    sndShot(0.3,ty==='jeep'?0.9:0.7);
+  }
+  P.firedT=1.2;
 }
 let vehGunSide=1;
 let flashT=0,vmKick=0,adsK=0,bobT=0;
@@ -1137,6 +1162,7 @@ function pickGoalBR(b){
   if(outNow||b.zoneRun||(outNext&&(Z.state==='shrink'||zoneLeft()<25))){ const a=Math.random()*6.283,rad=Math.sqrt(Math.random())*Math.max(3,Z.tr*0.55); tx=Z.tcx+Math.cos(a)*rad; tz=Z.tcz+Math.sin(a)*rad; }
   else if(Math.random()<0.7&&BR.doors.length){ let best=BR.doors[0],bs=1e9; for(let k=0;k<4;k++){ const d=BR.doors[Math.floor(Math.random()*BR.doors.length)]; const dd=Math.hypot(d.x-b.x,d.z-b.z)+(Math.hypot(d.x-Z.tcx,d.z-Z.tcz)>Z.tr?400:0); if(dd<bs){bs=dd;best=d;} } tx=best.x; tz=best.z; }
   else{ const a=Math.random()*6.283,rad=Math.sqrt(Math.random())*Z.r*0.7; tx=Z.cx+Math.cos(a)*rad; tz=Z.cz+Math.sin(a)*rad; }
+  { const dd=Math.hypot(tx-b.x,tz-b.z); if(dd>130){ tx=b.x+(tx-b.x)*130/dd; tz=b.z+(tz-b.z)*130/dd; } }
   b.path=navPath(b.x,b.z,tx,tz)||[]; b.pi=0; b.stuckT=0; b.sx=b.x; b.sz=b.z; b.pathAt=now;
 }
 function setPathTo(b,goal){
@@ -1270,7 +1296,7 @@ function updatePlayer(dt){
     if(ammo[cur]>0){ playerShoot(); if(!w.auto)mouseDown=false; }
     else startReload();
   }
-  if(P.alive&&state==='play'&&P.veh&&(P.veh.type==='heli'||P.veh.type==='plane')){ if(mouseDown&&fireCd<=0)vehShoot(); }
+  if(P.alive&&state==='play'&&P.veh&&ARMED[P.veh.type]){ if(mouseDown&&fireCd<=0)vehShoot(); }
   // hasar rejenerasyonu
   if(P.alive){ if(!MP.play){ if(regenT>0)regenT-=dt; else if(P.hp<P.maxHp)P.hp=Math.min(P.maxHp,P.hp+18*dt); } }
   else if((mode==='tdm'||(mode==='br'&&BR.dm))&&!MP.play){ P.respT-=dt; $('deadsub').textContent=($('deadsub').textContent.split(' | ')[0])+' | '+Math.max(0,Math.ceil(P.respT))+' sn'; if(P.respT<=0&&state==='play'){ respawn(P); $('dead').style.display='none'; } }
@@ -1378,19 +1404,21 @@ const skyMesh=(function(){
 })();
 
 /* ---------- Battle Royale dünyası ---------- */
-const BR={built:false,half:150,boxes:[],doors:[],houses:[],spots:[],items:[],grp:null,zone:null,alive:0,over:false,endT:0,place:0,vehSpawns:[],vehicles:[],zoneMesh:null};
+const BRS=1.9;
+const BR={built:false,half:285,boxes:[],doors:[],houses:[],spots:[],items:[],grp:null,zone:null,alive:0,over:false,endT:0,place:0,vehSpawns:[],vehicles:[],zoneMesh:null};
 let mode='tdm';
 const EMPTY={id:'bos',name:'Boş',cls:'',lvl:99,kind:'none',auto:false,rate:1,dmg:0,mag:0,res:0,reload:1,spread:0.01,recoil:0,range:1,pitch:900,ads:[0,-0.17,-0.35],len:0.2,empty:true};
 const ENV={name:'Kaza',team:'a',side:'env',css:'#ece8d8',isPlayer:false,kills:0};
 const ZONEA={name:'Çember',team:'a',side:'zone',css:'#4aa3ff',isPlayer:false,kills:0};
-const PHASES=[{wait:42,shrink:34,r:112,dmg:2},{wait:34,shrink:30,r:72,dmg:4},{wait:28,shrink:26,r:40,dmg:7},{wait:22,shrink:22,r:18,dmg:12},{wait:16,shrink:18,r:5,dmg:20}];
+const PHASES=[{wait:50,shrink:50,r:215,dmg:2},{wait:40,shrink:42,r:137,dmg:4},{wait:32,shrink:34,r:76,dmg:7},{wait:24,shrink:28,r:34,dmg:12},{wait:18,shrink:22,r:10,dmg:20}];
+function brZ0(){ return BR.dm?150:Math.round(BR.half*1.5); }
 function rng(seed){ let s=seed>>>0; return ()=>((s=(Math.imul(s,1664525)+1013904223)>>>0)/4294967296); }
 
 function setWorld(m){
   mode=m; BOXES.length=0; const src=m==='br'?BR.boxes:BOX_TDM; for(let i=0;i<src.length;i++)BOXES.push(src[i]);
   worldTDM.visible=(m==='tdm'); if(BR.grp)BR.grp.visible=(m==='br');
-  scene.fog.near=m==='br'?80:28; scene.fog.far=m==='br'?230:115;
-  camera.near=m==='br'?0.1:0.05; camera.far=m==='br'?460:220; camera.updateProjectionMatrix();
+  scene.fog.near=m==='br'?110:28; scene.fog.far=m==='br'?330:115;
+  camera.near=m==='br'?0.1:0.05; camera.far=m==='br'?760:220; camera.updateProjectionMatrix();
   document.body.classList.toggle('br',m==='br');
 }
 
@@ -1413,17 +1441,21 @@ function buildBRWorld(){
   const reserved=[]; const resv=(x0,x1,z0,z1)=>reserved.push({x0,x1,z0,z1});
   const ovl=(a,b)=>!(a.x1<b.x0||a.x0>b.x1||a.z1<b.z0||a.z0>b.z1);
   // yollar, pistler, bölgeler
-  resv(-148,148,-6,6); resv(-6,6,-148,148); resv(110,134,-132,-18); resv(83,107,-47,-33); resv(-69,-53,55,69); resv(46,114,-100,-26);
+  const S=BRS, BX=72, BZ=-57; // askerî üs ötelemesi
+  resv(-H+2,H-2,-6,6); resv(-6,6,-H+2,H-2); resv(122*S-12,122*S+12,-75*S-112,-75*S+112); resv(155,179,-104,-90); resv(-124,-108,110,126); resv(46+BX,114+BX,-100+BZ,-26+BZ);
+  const PADS=[[95+BX,-40+BZ],[-61*S,62*S]];
+  const TANKS=[[105,-100,0],[105,-125,0],[-200,-90,0],[-90,-215,0],[215,120,0],[-215,170,0]]; TANKS.forEach(a=>resv(a[0]-7,a[0]+7,a[1]-9,a[1]+9)); resv(53,67,198,212);
   // yollar (görsel)
   const flat=[]; const strip=(x,z,w,d,tex)=>{ const g=new THREE.PlaneGeometry(w,d); const uv=g.attributes.uv; for(let i=0;i<uv.count;i++)uv.setXY(i,uv.getX(i)*w/6,uv.getY(i)*d/6); return bake(g,x,0.03,z,-Math.PI/2,0,0); };
-  const roads=[strip(0,0,296,8),strip(0,0,8,296),strip(32,30,50,5),strip(-75,-31,5,56),strip(-80,38,5,64),strip(44,85,76,5),strip(54,-62,90,5)];
-  [[32,30,50,5],[-75,-31,5,56],[-80,38,5,64],[44,85,76,5],[54,-62,90,5]].forEach(a=>resv(a[0]-a[2]/2-1,a[0]+a[2]/2+1,a[1]-a[3]/2-1,a[1]+a[3]/2+1));
+  const RD=[[32*S,30*S,50*S,5],[-75*S,-31*S,5,56*S],[-80*S,38*S,5,64*S],[44*S,85*S,76*S,5],[54*S,-62*S,90*S,5],[-30*S,-95*S,60*S,5],[110*S,40*S,5,70*S],[-120*S,-70*S,60*S,5]];
+  const roads=[strip(0,0,2*H-4,8),strip(0,0,8,2*H-4)].concat(RD.map(a=>strip(a[0],a[1],a[2],a[3])));
+  RD.forEach(a=>resv(a[0]-a[2]/2-1,a[0]+a[2]/2+1,a[1]-a[3]/2-1,a[1]+a[3]/2+1));
   const roadMesh=new THREE.Mesh(mergeGeos(roads),new THREE.MeshStandardMaterial({map:TEX.dirt,roughness:1})); roadMesh.receiveShadow=true; grp.add(roadMesh);
   // pist ve helikopter pistleri
-  const rw=[strip(122,-75,16,114)]; for(let k=0;k<9;k++) rw.push(bake(new THREE.PlaneGeometry(0.8,7),122,0.05,-125+k*12,-Math.PI/2,0,0,1,1,1,0xe8e4d0));
-  const padM=[new THREE.CircleGeometry(7,24),new THREE.CircleGeometry(7,24)]; bake(padM[0],95,0.04,-40,-Math.PI/2,0,0,1,1,1,0x55585a); bake(padM[1],-61,0.04,62,-Math.PI/2,0,0,1,1,1,0x55585a);
-  [[95,-40],[-61,62]].forEach(p=>{ rw.push(bake(new THREE.PlaneGeometry(0.7,5),p[0]-1.6,0.06,p[1],-Math.PI/2,0,0,1,1,1,0xe8e4d0)); rw.push(bake(new THREE.PlaneGeometry(0.7,5),p[0]+1.6,0.06,p[1],-Math.PI/2,0,0,1,1,1,0xe8e4d0)); rw.push(bake(new THREE.PlaneGeometry(3.2,0.7),p[0],0.06,p[1],-Math.PI/2,0,0,1,1,1,0xe8e4d0)); });
-  const runM=new THREE.Mesh(mergeGeos([bake(new THREE.PlaneGeometry(16,114),122,0.035,-75,-Math.PI/2,0,0,1,1,1,0x4d5052),padM[0],padM[1]].concat(rw.slice(1))),ACCM); runM.receiveShadow=true; grp.add(runM);
+  const RWX=122*S, RWZ=-75*S, RWL=114*S; const rw=[strip(RWX,RWZ,16,RWL)]; for(let k=0;k<18;k++) rw.push(bake(new THREE.PlaneGeometry(0.8,7),RWX,0.05,RWZ-RWL/2+8+k*12,-Math.PI/2,0,0,1,1,1,0xe8e4d0));
+  const padM=[new THREE.CircleGeometry(7,24),new THREE.CircleGeometry(7,24)]; bake(padM[0],PADS[0][0],0.04,PADS[0][1],-Math.PI/2,0,0,1,1,1,0x55585a); bake(padM[1],PADS[1][0],0.04,PADS[1][1],-Math.PI/2,0,0,1,1,1,0x55585a);
+  PADS.forEach(p=>{ rw.push(bake(new THREE.PlaneGeometry(0.7,5),p[0]-1.6,0.06,p[1],-Math.PI/2,0,0,1,1,1,0xe8e4d0)); rw.push(bake(new THREE.PlaneGeometry(0.7,5),p[0]+1.6,0.06,p[1],-Math.PI/2,0,0,1,1,1,0xe8e4d0)); rw.push(bake(new THREE.PlaneGeometry(3.2,0.7),p[0],0.06,p[1],-Math.PI/2,0,0,1,1,1,0xe8e4d0)); });
+  const runM=new THREE.Mesh(mergeGeos([bake(new THREE.PlaneGeometry(16,RWL),RWX,0.035,RWZ,-Math.PI/2,0,0,1,1,1,0x4d5052),padM[0],padM[1]].concat(rw.slice(1))),ACCM); runM.receiveShadow=true; grp.add(runM);
   // ev yapıcı
   const house=(cx,cz,w,d,o)=>{
     o=o||{}; const t=0.4,h=o.h||3.2,gap=2.2;
@@ -1448,17 +1480,18 @@ function buildBRWorld(){
       reserved.push(rect); house(cx,cz,w,d,cfg.o); return true; }
     return false;
   };
-  const TOWNS=[{x:34,z:32,k:8,s:30},{x:-75,z:-62,k:5,s:26},{x:-80,z:72,k:5,s:26,big:true},{x:80,z:88,k:5,s:24},{x:-35,z:-105,k:4,s:20},{x:-25,z:108,k:4,s:20}];
+  const TOWNS=[{x:34,z:32,k:8,s:30},{x:-75,z:-62,k:5,s:26},{x:-80,z:72,k:5,s:26,big:true},{x:80,z:88,k:5,s:24},{x:-35,z:-105,k:4,s:20},{x:-25,z:108,k:4,s:20}]
+    .map(t=>({x:t.x*S,z:t.z*S,k:t.k*2,s:t.s*1.35,big:t.big})).concat([{x:150,z:60,k:7,s:34,big:true},{x:-190,z:-170,k:7,s:34},{x:170,z:210,k:7,s:34},{x:-215,z:10,k:6,s:30},{x:40,z:-215,k:6,s:30},{x:-60,z:215,k:6,s:30},{x:215,z:-20,k:5,s:26}]);
   for(const t of TOWNS) for(let i=0;i<t.k;i++){ if(t.big&&i<2) tryHouse(t.x,t.z,t.s,{w:rr(14,18),d:rr(10,12),o:{h:4.4}}); else tryHouse(t.x,t.z,t.s); }
   // askerî üs
-  house(60,-48,14,8,{dS:-3,dN:3}); house(60,-62,14,8,{dS:3,dN:-3}); house(60,-76,14,8,{dS:-3,dN:3});
-  add(92,-92,16,10,6,'hangar'); add(76,-92,10,8,4,'hangar'); add(74,-66,6,2.4,2.8,'cont0'); add(74,-61,6,2.4,2.8,'cont1'); add(80,-66,2.4,6,2.8,'cont2');
-  add(100,-64,6,1,1.2,'low'); add(103,-61.5,1,6,1.2,'low'); add(70,-92,3,3,3.4,'tank'); add(88,-70,1.6,1.6,1.1,'crate'); add(90.5,-70,1.6,1.6,1.1,'crate'); add(89,-71.8,1.6,1.6,1.1,'crate');
-  for(let i=0;i<7;i++) BR.spots.push({x:rr(62,108),z:rr(-98,-52)});
+  house(60+BX,-48+BZ,14,8,{dS:-3,dN:3}); house(60+BX,-62+BZ,14,8,{dS:3,dN:-3}); house(60+BX,-76+BZ,14,8,{dS:-3,dN:3});
+  add(92+BX,-92+BZ,16,10,6,'hangar'); add(76+BX,-92+BZ,10,8,4,'hangar'); add(74+BX,-66+BZ,6,2.4,2.8,'cont0'); add(74+BX,-61+BZ,6,2.4,2.8,'cont1'); add(80+BX,-66+BZ,2.4,6,2.8,'cont2');
+  add(100+BX,-64+BZ,6,1,1.2,'low'); add(103+BX,-61.5+BZ,1,6,1.2,'low'); add(70+BX,-92+BZ,3,3,3.4,'tank'); add(88+BX,-70+BZ,1.6,1.6,1.1,'crate'); add(90.5+BX,-70+BZ,1.6,1.6,1.1,'crate'); add(89+BX,-71.8+BZ,1.6,1.6,1.1,'crate');
+  for(let i=0;i<10;i++) BR.spots.push({x:rr(62+BX,108+BX),z:rr(-98+BZ,-52+BZ)});
   // ekstra açık hava düzenlemeleri (konteyner, sandık)
   const props=['cont0','cont1','cont2'];
-  for(let i=0;i<14;i++){ const x=rr(-130,130),z=rr(-130,130),k=props[i%3],w=R()<0.5?6:2.4,d=w===6?2.4:6; const rect={x0:x-w/2-3,x1:x+w/2+3,z0:z-d/2-3,z1:z+d/2+3}; if(reserved.some(r=>ovl(r,rect)))continue; reserved.push(rect); add(x,z,w,d,2.8,k); BR.spots.push({x:x+(w===6?0:3.2),z:z+(w===6?3.2:0)}); }
-  for(let i=0;i<22;i++){ const x=rr(-135,135),z=rr(-135,135); const rect={x0:x-3,x1:x+3,z0:z-3,z1:z+3}; if(reserved.some(r=>ovl(r,rect)))continue; reserved.push(rect); add(x,z,1.6,1.6,1.1,'crate'); if(R()<0.4)BR.spots.push({x:x+2.2,z:z}); }
+  for(let i=0;i<50;i++){ const x=rr(-H+20,H-20),z=rr(-H+20,H-20),k=props[i%3],w=R()<0.5?6:2.4,d=w===6?2.4:6; const rect={x0:x-w/2-3,x1:x+w/2+3,z0:z-d/2-3,z1:z+d/2+3}; if(reserved.some(r=>ovl(r,rect)))continue; reserved.push(rect); add(x,z,w,d,2.8,k); BR.spots.push({x:x+(w===6?0:3.2),z:z+(w===6?3.2:0)}); }
+  for(let i=0;i<80;i++){ const x=rr(-H+15,H-15),z=rr(-H+15,H-15); const rect={x0:x-3,x1:x+3,z0:z-3,z1:z+3}; if(reserved.some(r=>ovl(r,rect)))continue; reserved.push(rect); add(x,z,1.6,1.6,1.1,'crate'); if(R()<0.4)BR.spots.push({x:x+2.2,z:z}); }
   // çevre duvarı
   add(0,-H-0.5,2*H+4,1,7,'wall'); add(0,H+0.5,2*H+4,1,7,'wall'); add(-H-0.5,0,1,2*H+4,7,'wall'); add(H+0.5,0,1,2*H+4,7,'wall');
   // çatılara çıkan dış merdivenler (sniper noktaları): basamak 0.28 m (0.3 altı: otomatik çıkılır)
@@ -1486,9 +1519,9 @@ function buildBRWorld(){
   const oak=mergeGeos([bake(new THREE.CylinderGeometry(0.3,0.42,3.2,7),0,1.6,0,0,0,0,1,1,1,0x5e4632),bake(new THREE.SphereGeometry(2.0,10,8),0,4.5,0,0,0,0,1,0.85,1,0x4f6b2e),
     bake(new THREE.SphereGeometry(1.5,9,7),1.2,3.9,0.4,0,0,0,1,1,1,0x5a7834),bake(new THREE.SphereGeometry(1.4,9,7),-1.0,4.0,-0.6,0,0,0,1,1,1,0x466228)]);
   const trees=[]; let tries=0;
-  while(trees.length<230&&tries++<3000){
+  while(trees.length<830&&tries++<12000){
     const x=rr(-H+4,H-4),z=rr(-H+4,H-4); const rect={x0:x-1.5,x1:x+1.5,z0:z-1.5,z1:z+1.5};
-    if(reserved.some(r=>ovl(r,rect)))continue; const edge=Math.max(Math.abs(x),Math.abs(z))>85; if(R()>(edge?0.8:0.3))continue;
+    if(reserved.some(r=>ovl(r,rect)))continue; const edge=Math.max(Math.abs(x),Math.abs(z))>85*S; if(R()>(edge?0.8:0.3))continue;
     trees.push({x,z,s:rr(0.8,1.35),r:R()*6.28,pine:R()<0.62});
   }
   const mkInst=(geo,list)=>{ const im=new THREE.InstancedMesh(geo,ACCM,Math.max(1,list.length)); const m4=new THREE.Matrix4(),q=new THREE.Quaternion(),sc=new THREE.Vector3(),ps=new THREE.Vector3(),e=new THREE.Euler();
@@ -1498,7 +1531,7 @@ function buildBRWorld(){
   for(const t of trees){ boxes.push({cx:t.x,cz:t.z,w:0.8,d:0.8,h:6,kind:'tree',minx:t.x-0.4,maxx:t.x+0.4,minz:t.z-0.4,maxz:t.z+0.4,miny:0,maxy:6}); }
   // kayalar
   const rocks=[]; tries=0;
-  while(rocks.length<26&&tries++<500){
+  while(rocks.length<90&&tries++<2000){
     const x=rr(-H+8,H-8),z=rr(-H+8,H-8),w=rr(2.4,4.6),h=rr(1.4,2.8); const rect={x0:x-w,x1:x+w,z0:z-w,z1:z+w}; if(reserved.some(r=>ovl(r,rect)))continue; reserved.push(rect);
     rocks.push({x,z,w,h}); boxes.push({cx:x,cz:z,w:w*0.85,d:w*0.85,h,kind:'rock',minx:x-w*0.42,maxx:x+w*0.42,minz:z-w*0.42,maxz:z+w*0.42,miny:0,maxy:h*0.9});
   }
@@ -1507,15 +1540,20 @@ function buildBRWorld(){
     rocks.forEach((r,i)=>{ e.set(0,R()*6.28,0); q.setFromEuler(e); ps.set(r.x,r.h*0.35,r.z); sc.set(r.w*0.55,r.h*0.62,r.w*0.55); m4.compose(ps,q,sc); rockIM.setMatrixAt(i,m4); });
     rockIM.frustumCulled=false; rockIM.castShadow=true; rockIM.receiveShadow=true; grp.add(rockIM); }
   // uzaktaki tepeler
-  const hills=[]; for(let i=0;i<18;i++){ const a=i/18*6.283+rr(-0.1,0.1),rad=rr(205,235),hh=rr(22,44); hills.push(bake(new THREE.ConeGeometry(rr(30,50),hh,7),Math.cos(a)*rad,hh/2-4,Math.sin(a)*rad,0,R()*3,0,1,1,1,[0x56664a,0x4a5a44,0x6a6f5e][i%3])); }
+  const hills=[]; for(let i=0;i<30;i++){ const a=i/30*6.283+rr(-0.1,0.1),rad=rr(H+60,H+95),hh=rr(30,60); hills.push(bake(new THREE.ConeGeometry(rr(45,75),hh,7),Math.cos(a)*rad,hh/2-4,Math.sin(a)*rad,0,R()*3,0,1,1,1,[0x56664a,0x4a5a44,0x6a6f5e][i%3])); }
   grp.add(new THREE.Mesh(mergeGeos(hills),ACCM));
   // çember görseli
   const zm=new THREE.Mesh(new THREE.CylinderGeometry(1,1,150,56,1,true),new THREE.MeshBasicMaterial({color:0x2f86ff,transparent:true,opacity:0.2,side:THREE.DoubleSide,depthWrite:false,fog:false}));
   zm.position.y=75; zm.frustumCulled=false; scene.add(zm); BR.zoneMesh=zm; zm.visible=false;
   // araç doğma noktaları
-  BR.vehSpawns=[{t:'car',x:12,z:0,yaw:Math.PI/2},{t:'car',x:-40,z:0,yaw:Math.PI/2},{t:'car',x:62,z:0,yaw:-Math.PI/2},{t:'car',x:0,z:48,yaw:0},{t:'car',x:0,z:-42,yaw:0},{t:'car',x:0,z:-96,yaw:0},
-    {t:'bike',x:25,z:-2,yaw:Math.PI/2},{t:'bike',x:-58,z:2,yaw:Math.PI/2},{t:'bike',x:2,z:72,yaw:0},{t:'bike',x:-3,z:-62,yaw:0},
-    {t:'heli',x:95,z:-40,yaw:Math.PI},{t:'heli',x:-61,z:62,yaw:0},{t:'plane',x:122,z:-26,yaw:0},{t:'plane',x:122,z:-124,yaw:Math.PI}];
+  { const H2=Math.PI/2; BR.vehSpawns=[];
+    const V=(t,x,z,yaw)=>BR.vehSpawns.push({t,x,z,yaw});
+    [[23,0,H2],[-76,0,H2],[118,0,-H2],[-150,0,H2],[200,0,-H2],[0,91,0],[0,-80,0],[0,-182,0]].forEach(a=>V('car',a[0],a[1],a[2]));
+    [[47,-2,H2],[-110,2,H2],[4,137,0],[-6,-118,0],[-225,2,H2],[2,245,0]].forEach(a=>V('bike',a[0],a[1],a[2]));
+    [[70,3,H2],[-35,-3,H2],[160,3,-H2],[-190,-3,H2],[3,-150,0],[-3,170,0],[3,50,0],[-3,-220,0]].forEach(a=>V('jeep',a[0],a[1],a[2]));
+    TANKS.forEach(a=>V('tank',a[0],a[1],a[2]));
+    V('heli',PADS[0][0],PADS[0][1],Math.PI); V('heli',PADS[1][0],PADS[1][1],0); V('heli',60,205,0);
+    V('plane',RWX,-60,0); V('plane',RWX,-232,Math.PI); }
   BR.built=true;
 }
 
@@ -1534,7 +1572,7 @@ function zoneNext(){
   Z.tcx=clamp(Z.cx+Math.cos(a)*d,-lim,lim); Z.tcz=clamp(Z.cz+Math.sin(a)*d,-lim,lim);
 }
 function zoneInit(){
-  BR.zone={cx:0,cz:0,r:215,fcx:0,fcz:0,fr:215,tcx:0,tcz:0,tr:0,phase:0,t:-12,state:'wait',tick:0};
+  BR.zone={cx:0,cz:0,r:brZ0(),fcx:0,fcz:0,fr:brZ0(),tcx:0,tcz:0,tr:0,phase:0,t:-12,state:'wait',tick:0};
   zoneNext(); BR.zoneMesh.visible=true; updateZoneMesh();
 }
 function updateZoneMesh(){ const Z=BR.zone; BR.zoneMesh.position.set(Z.cx,75,Z.cz); BR.zoneMesh.scale.set(Math.max(0.5,Z.r),1,Math.max(0.5,Z.r)); }
@@ -1608,7 +1646,7 @@ function startDM(){
   if(!BR.built){ buildBRWorld(); setWorld('br'); buildNav(BR.half); createVehicles(); } else setWorld('br');
   mode='br'; BR.dm=true; BR.over=false; BR.endT=0; BR.place=0; BR.ts=1; BR.total=16; brRand=Math.random; zoneRand=Math.random;
   applyLoadout(); gained=0; sessionUnlocks=[]; lvlQ=[]; lvlBusy=false; $('lvl').style.opacity=0; hudCache={};
-  zoneInit(); { const Z=BR.zone; Z.r=Z.tr=215; Z.cx=Z.cz=Z.tcx=Z.tcz=0; } BR.zoneMesh.visible=false;
+  zoneInit(); { const Z=BR.zone; Z.r=Z.tr=brZ0(); Z.cx=Z.cz=Z.tcx=Z.tcz=0; } BR.zoneMesh.visible=false;
   BR.items=[]; if(BR.itemGrp)while(BR.itemGrp.children.length)BR.itemGrp.remove(BR.itemGrp.children[0]);
   resetVehicles(); for(const v of BR.vehicles){ v.mesh.visible=false; v.occupied=true; syncVehBox(v); }
   timeLeft=600; score.a=score.o=0;
@@ -1634,14 +1672,14 @@ function startBR(){
   LOADOUT=[WBYID.nobet,EMPTY,EMPTY];
   gained=0; sessionUnlocks=[]; lvlQ=[]; lvlBusy=false; $('lvl').style.opacity=0; hudCache={};
   P=makeFighter('Sen','a',true,false); P.side='Sen'; P.css='#ece8d8'; P.vx=P.vz=P.vy=0; P.veh=null; P.air=true; P.sprint=false; P.gren=1; P.smk=1;
-  P.x=rnd(-60,60); P.z=rnd(-60,60); P.y=140; P.yaw=rnd(0,6.28); P.pitch=-0.45; P.canopy=makeCanopy(); scene.add(P.canopy);
+  P.x=rnd(-60,60)*BRS; P.z=rnd(-60,60)*BRS; P.y=330; P.yaw=rnd(0,6.28); P.pitch=-0.45; P.canopy=makeCanopy(); scene.add(P.canopy);
   P.style={camo:'woodland',vest:0x4a5a3a,helm:0x3f4a36,skin:0xc79b78,bal:false,pack:0x3b4030,col:0x888888};
   fighters.push(P);
   const names=BRNAMES.slice().sort(()=>Math.random()-0.5), kinds=['woodland','desert','urban','black','blue'];
   for(let i=0;i<15;i++){
     const st={camo:kinds[Math.floor(Math.random()*5)],vest:[0x4a5a3a,0x5a4a32,0x3a3d40,0x2e2f2e][i%4],helm:[0x3f4a36,0x6b5a3c,0x2d3033,0x1c1d1d][i%4],skin:SKINS[i%5],bal:Math.random()<0.2,pack:Math.random()<0.65?[0x3b4030,0x5a4a32,0x2d3033][i%3]:0,col:0x888888};
     const f=makeFighter(names[i],'a',false,false,st,randomWeapon()); f.side=names[i]; f.css=hslHex(i/15); f.air=true;
-    f.x=rnd(-90,90); f.z=rnd(-90,90); f.y=rnd(115,150); f.yaw=rnd(0,6.28); f.armor=Math.random()<0.4?25*(1+Math.floor(Math.random()*3)):0;
+    f.x=rnd(-90,90)*BRS; f.z=rnd(-90,90)*BRS; f.y=rnd(300,340); f.yaw=rnd(0,6.28); f.armor=Math.random()<0.4?25*(1+Math.floor(Math.random()*3)):0;
     const dd=BR.doors[Math.floor(Math.random()*BR.doors.length)], cxz=navXZ(navFree(navIdx(dd.x+rnd(-3,3),dd.z+rnd(-3,3)))); f.dropTx=cxz[0]; f.dropTz=cxz[1];
     f.canopy=makeCanopy(); f.mesh.add(f.canopy); fighters.push(f);
   }
@@ -1659,7 +1697,7 @@ function updateBR(dt){
   if(BR.endT>0){ BR.endT-=dt; if(BR.endT<=0) endBR(false); }
 }
 function drawRadarBR(){
-  const S=168,sc=S/170,cx=S/2,cy=S/2; rc.clearRect(0,0,S,S);
+  const S=168,sc=S/300,cx=S/2,cy=S/2; rc.clearRect(0,0,S,S);
   const w2s=(x,z)=>[cx+(x-P.x)*sc,cy+(z-P.z)*sc]; const Z=BR.zone;
   rc.lineWidth=1.6; rc.strokeStyle='#4aa3ff'; let p=w2s(Z.cx,Z.cz); rc.beginPath(); rc.arc(p[0],p[1],Z.r*sc,0,6.283); rc.stroke();
   rc.strokeStyle='rgba(255,255,255,.85)'; p=w2s(Z.tcx,Z.tcz); rc.beginPath(); rc.arc(p[0],p[1],Z.tr*sc,0,6.283); rc.stroke();
@@ -1718,12 +1756,14 @@ function pickup(it){
 }
 
 /* ---------- Araçlar ---------- */
-const VNAME={car:'Askerî cip',bike:'Motosiklet',heli:'Helikopter',plane:'Uçak'};
-const VRANGE={car:3.6,bike:2.8,heli:5.2,plane:6.2};
-const VCFG={car:{acc:17,brake:38,max:31,rev:9,turn:1.75,r:1.5,h:1.8,wr:0.42},bike:{acc:21,brake:34,max:37,rev:6,turn:2.4,r:0.8,h:1.5,wr:0.34}};
-const VCAM={car:{d:7.5,h:1.6,look:0.4},bike:{d:5.5,h:1.4,look:0.5},heli:{d:15,h:2.5,look:1},plane:{d:15,h:2.4,look:1}};
-const VDIM={car:[1.0,2.1,1.9],bike:[0.45,1.1,1.2],heli:[1.5,3.4,3.2],plane:[4.6,3.8,2.6]};
-const VHELP={car:'W/S gaz-fren, A/D direksiyon, Boşluk el freni, E ile in',bike:'W/S gaz-fren, A/D direksiyon, Boşluk fren, E ile in',
+const VNAME={car:'Askerî cip',bike:'Motosiklet',heli:'Helikopter',plane:'Uçak',jeep:'Makineli jip',tank:'Tank'};
+const ARMED={heli:1,plane:1,jeep:1,tank:1};
+const VRANGE={car:3.6,bike:2.8,heli:5.2,plane:6.2,jeep:4.2,tank:5.2};
+const VCFG={car:{acc:17,brake:38,max:31,rev:9,turn:1.75,r:1.5,h:1.8,wr:0.42},bike:{acc:21,brake:34,max:37,rev:6,turn:2.4,r:0.8,h:1.5,wr:0.34},
+  jeep:{acc:18,brake:38,max:30,rev:9,turn:1.85,r:1.6,h:1.9,wr:0.45},tank:{acc:8,brake:30,max:13,rev:5,turn:1.15,r:2.5,h:2.6,wr:0.5}};
+const VCAM={car:{d:7.5,h:1.6,look:0.4},bike:{d:5.5,h:1.4,look:0.5},heli:{d:15,h:2.5,look:1},plane:{d:15,h:2.4,look:1},jeep:{d:8.5,h:2.2,look:1},tank:{d:12,h:3.4,look:1}};
+const VDIM={car:[1.0,2.1,1.9],bike:[0.45,1.1,1.2],heli:[1.5,3.4,3.2],plane:[4.6,3.8,2.6],jeep:[1.1,2.3,2.0],tank:[1.9,3.3,2.7]};
+const VHELP={jeep:'W/S gaz-fren, A/D direksiyon, Boşluk el freni. Sol tık: makineli tüfek (fareyle nişan). Yanına bir arkadaşın yolcu/nişancı olarak binebilir. E ile in',tank:'W/S ileri-geri, A/D dön, Boşluk fren. Sol tık: top (patlayıcı mermi), fareyle namlu yönü. Çarptığını ezer. E ile in',car:'W/S gaz-fren, A/D direksiyon, Boşluk el freni, E ile in',bike:'W/S gaz-fren, A/D direksiyon, Boşluk fren, E ile in',
   heli:'W/S ileri-geri, A/D dön, Boşluk yüksel, Shift alçal. Sol tık: ateş. Yerdeyken E ile in, havadayken E ile paraşütle atla',plane:'W/S gaz, A/D dön, Boşluk burun yukarı, Shift burun aşağı. Sol tık: ateş. Hız 24 üstünde havalanır. Yerdeyken E ile in, havadayken E ile paraşütle atla'};
 function buildVehicleMesh(type){
   const bx=(w,h,d,x,y,z,col,rx,ry,rz)=>bake(new THREE.BoxGeometry(w,h,d),x,y,z,rx||0,ry||0,rz||0,1,1,1,col);
@@ -1759,6 +1799,29 @@ function buildVehicleMesh(type){
     P_.steer.push(fg); P_.wheels.push({m:wg,r:0.34});
     wheel(0,0.34,0.85,0.34,0.14);
     P_.seat={x:0,y:0.98,z:0.38};
+  } else if(type==='jeep'){
+    const O=0x6a6a3c,D=0x222322;
+    body.push(bx(1.9,0.5,3.8,0,0.75,0,O),bx(1.8,0.4,1.3,0,1.0,-1.35,O),bx(1.95,0.14,0.3,0,0.6,-2.0,0x2b2b2b),bx(1.95,0.14,0.3,0,0.6,2.0,0x2b2b2b),
+      bx(0.08,0.8,0.08,-0.85,1.4,-0.75,D),bx(0.08,0.8,0.08,0.85,1.4,-0.75,D),bx(1.7,0.06,0.06,0,1.8,-0.75,D),bx(0.2,0.14,0.06,-0.7,1.0,-2.02,0xffe9a8),bx(0.2,0.14,0.06,0.7,1.0,-2.02,0xffe9a8),
+      bx(0.5,0.25,0.5,-0.45,1.1,-0.35,0x2a2a2a),bx(0.6,0.3,0.5,0,1.1,1.0,0x2a2a2a),bx(0.9,0.08,0.9,0,1.05,0.45,0x3b3d2a),
+      bx(1.9,0.1,0.9,0,0.55,1.55,0x3b3d2a),cy(0.4,0.4,0.2,0,1.0,2.1,Math.PI/2,0,0,0x1b1b1b,14),bx(0.06,0.9,0.06,-0.9,1.3,1.8,D),bx(0.06,0.9,0.06,0.9,1.3,1.8,D),bx(1.8,0.06,0.06,0,1.75,1.8,D));
+    glass.push(bx(1.7,0.6,0.05,0,1.4,-0.75,0x9ec6e0,-0.3));
+    addMesh(body,ACCM); addMesh(glass,GL,false);
+    wheel(-1.0,0.45,-1.4,0.45,0.32,true); wheel(1.0,0.45,-1.4,0.45,0.32,true); wheel(-1.0,0.45,1.3,0.45,0.32); wheel(1.0,0.45,1.3,0.45,0.32);
+    const tg=new THREE.Group(); tg.position.set(0,1.55,0.45);
+    tg.add(new THREE.Mesh(mergeGeos([cy(0.07,0.07,0.9,0,-0.1,0,0,0,0,D,8),bx(0.14,0.16,1.2,0,0.28,-0.55,0x2b2d2b),bx(0.05,0.05,0.5,0,0.28,-1.3,0x1a1a1a),bx(1.0,0.55,0.06,0,0.35,-0.95,0x4a4d36),bx(0.2,0.2,0.3,0,0.22,0.1,0x2b2d2b)]),ACCM));
+    g.add(tg); P_.turret=tg;
+    P_.seat={x:-0.45,y:1.05,z:-0.35}; P_.seat2={x:0,y:1.05,z:1.05};
+  } else if(type==='tank'){
+    const O=0x4c5638,D=0x222322;
+    body.push(bx(3.0,0.9,6.2,0,1.05,0,O),bx(2.6,0.5,2.4,0,1.7,-2.2,0x424c31),bx(0.9,0.5,6.8,-1.75,0.7,0,D),bx(0.9,0.5,6.8,1.75,0.7,0,D),bx(0.9,0.14,7.0,-1.75,1.0,0,0x333433),bx(0.9,0.14,7.0,1.75,1.0,0,0x333433),
+      bx(2.8,0.3,0.5,0,1.0,3.1,0x3a3d2e),bx(0.5,0.4,0.9,-1.0,1.55,2.4,0x2e3025),bx(0.5,0.4,0.9,1.0,1.55,2.4,0x2e3025));
+    for(let k=-3;k<=3;k++){ body.push(cy(0.42,0.42,0.12,-2.25,0.55,k*0.95,0,0,Math.PI/2,0x30322f,10),cy(0.42,0.42,0.12,2.25,0.55,k*0.95,0,0,Math.PI/2,0x30322f,10)); }
+    addMesh(body,ACCM);
+    const tg=new THREE.Group(); tg.position.set(0,1.55,0.3);
+    tg.add(new THREE.Mesh(mergeGeos([bx(2.3,0.85,2.8,0,0.45,0,O),bx(1.6,0.45,1.4,0,1.0,0.3,0x424c31),cy(0.15,0.17,4.4,0,0.55,-3.2,Math.PI/2,0,0,D,10),cy(0.22,0.22,0.5,0,0.55,-5.3,Math.PI/2,0,0,D,10),cy(0.2,0.2,0.25,-0.5,1.3,0.5,0,0,0,D,8),bx(0.7,0.4,0.6,0.7,0.5,1.5,0x3a3d2e)]),ACCM));
+    g.add(tg); P_.turret=tg;
+    P_.seat={x:0,y:1.9,z:0.3};
   } else if(type==='heli'){
     const O=0x3f4a3a,D=0x222322;
     body.push(sp(1.2,0,1.6,0,0.95,1.0,1.9,O),bx(1.6,0.3,2.5,0,0.85,0.2,0x2d352b),cy(0.32,0.14,5.4,0,1.95,4.6,Math.PI/2,0,0,O,10),bx(0.1,1.4,1.0,0,2.55,7.0,O),bx(2.0,0.08,0.6,0,2.0,6.8,O),
@@ -1800,22 +1863,33 @@ function createVehicles(){
   for(const sp of BR.vehSpawns){
     const m=buildVehicleMesh(sp.t); BR.grp.add(m.g);
     const fig=buildFigure(DRIVER_STY,{}); sitFig(fig,true); fig.g.position.set(m.seat.x,m.seat.y-0.3,m.seat.z); fig.g.visible=false; m.g.add(fig.g);
-    const v={idx:BR.vehicles.length,driver:0,type:sp.t,home:sp,x:sp.x,y:0,z:sp.z,yaw:sp.yaw,speed:0,vy:0,thr:0,rotor:0,steer:0,yawRate:0,pitchV:0,roll:0,occupied:false,mesh:m.g,parts:m,fig};
+    let fig2=null; if(m.seat2){ fig2=buildFigure(DRIVER_STY,{}); sitFig(fig2,true); fig2.g.position.set(m.seat2.x,m.seat2.y-0.3,m.seat2.z); fig2.g.visible=false; m.g.add(fig2.g); }
+    const v={idx:BR.vehicles.length,driver:0,pass:0,ty:0,type:sp.t,home:sp,x:sp.x,y:0,z:sp.z,yaw:sp.yaw,speed:0,vy:0,thr:0,rotor:0,steer:0,yawRate:0,pitchV:0,roll:0,occupied:false,mesh:m.g,parts:m,fig,fig2};
     v.box={cx:v.x,cz:v.z,w:1,d:1,h:1,kind:'veh',minx:0,maxx:0,minz:0,maxz:0,miny:0,maxy:1,veh:v};
     BR.boxes.push(v.box); BOXES.push(v.box); syncVehBox(v); placeVeh(v); BR.vehicles.push(v);
   }
 }
 function resetVehicles(){
-  for(const v of BR.vehicles){ v.x=v.home.x; v.z=v.home.z; v.yaw=v.home.yaw; v.y=0; v.speed=0; v.vy=0; v.thr=0; v.rotor=0; v.steer=0; v.yawRate=0; v.pitchV=0; v.roll=0; v.occupied=false; v.driver=0; v.tgt=null; v.mesh.visible=true; v.fig.g.visible=false; syncVehBox(v); placeVeh(v); }
+  for(const v of BR.vehicles){ v.x=v.home.x; v.z=v.home.z; v.yaw=v.home.yaw; v.y=0; v.speed=0; v.vy=0; v.thr=0; v.rotor=0; v.steer=0; v.yawRate=0; v.pitchV=0; v.roll=0; v.occupied=false; v.driver=0; v.pass=0; v.ty=0; v.tgt=null; v.mesh.visible=true; v.fig.g.visible=false; if(v.fig2)v.fig2.g.visible=false; syncVehBox(v); placeVeh(v); }
 }
-function clearBRThings(){ if(BR.vehicles)for(const v of BR.vehicles){ v.occupied=false; v.fig.g.visible=false; } }
+function clearBRThings(){ if(BR.vehicles)for(const v of BR.vehicles){ v.occupied=false; v.pass=0; v.fig.g.visible=false; if(v.fig2)v.fig2.g.visible=false; } }
+function showDriver(v,on){ v.fig.g.visible=!!on&&v.type!=='tank'; }
 function crashHurt(a){ if(a<=0||!P.alive)return; damage(P,a,ENV,false); hurtT=0.7; sndShot(0.35,300); burst(P.x,P.y+1,P.z,0xcfa24a,8,4); }
-function enterVehicle(v){
-  P.veh=v; v.occupied=true; syncVehBox(v); v.fig.g.visible=true; v.speed=0; v.vy=0; v.steer=0; v.yawRate=0;
+function enterVehicle(v,seat){
+  seat=seat||0; P.seat=seat;
+  if(seat===1){ P.veh=v; v.pass=MP.id||1; if(v.fig2)v.fig2.g.visible=true; P.yaw=0; P.pitch=0.12; mouseDown=false; mouseR=false; adsK=0; $('vinfo').style.display='block'; toast('Yolcu/nişancı: sol tık ateş, fareyle namlu yönü. E ile in',4200); sndClick(); return; }
+  P.veh=v; v.occupied=true; syncVehBox(v); showDriver(v,true); v.speed=0; v.vy=0; v.steer=0; v.yawRate=0;
   P.yaw=0; P.pitch=0.12; mouseDown=false; mouseR=false; adsK=0; $('vinfo').style.display='block'; toast(VNAME[v.type]+': '+VHELP[v.type],5200); sndClick();
 }
 function leaveVehicle(force){
   const v=P.veh; if(!v)return;
+  if(P.seat===1){
+    if(!force){ const c=Math.cos(v.yaw), s=Math.sin(v.yaw), dirs=[[c,-s],[-c,s],[-s,-c],[s,c],[c-s,-s-c],[-c-s,s-c]]; let px=null,pz=null;
+      for(let dist=3.2;dist<=16&&px===null;dist+=0.8){ for(const k of dirs){ const l=Math.hypot(k[0],k[1])||1, tx=v.x+k[0]/l*dist, tz=v.z+k[1]/l*dist; if(!blockedAt(tx,tz,0.45,0)){ px=tx; pz=tz; break; } } }
+      if(px===null){ px=v.x+c*10; pz=v.z-s*10; } P.x=px; P.z=pz; P.y=0; P.yaw=v.yaw; P.pitch=0; }
+    P.vx=P.vz=0; P.vy=0; P.veh=null; P.seat=0; v.pass=0; if(v.fig2)v.fig2.g.visible=false; $('vinfo').style.display='none';
+    if(MP.play)mpSend({t:'vleave',i:v.idx,s:1}); return;
+  }
   if(!force&&(v.type==='heli'||v.type==='plane')&&v.y>2.8){ toast('Önce alçal'); return; }
   if(!force){
     // araç kutusu açıkken en yakın boş yeri ara (dönmüş aracın kutusu büyüktür; eskiden içine düşüp sıkışıyorduk)
@@ -1828,7 +1902,7 @@ function leaveVehicle(force){
     if(px===null){ px=v.x+c*10; pz=v.z-s*10; }
     P.x=px; P.z=pz; P.y=0; P.yaw=v.yaw; P.pitch=0;
   }
-  P.vx=P.vz=0; P.vy=0; P.veh=null; v.occupied=false; v.fig.g.visible=false; v.speed=0; v.thr=0; v.steer=0; syncVehBox(v); $('vinfo').style.display='none';
+  P.vx=P.vz=0; P.vy=0; P.veh=null; P.seat=0; v.occupied=false; v.fig.g.visible=false; v.speed=0; v.thr=0; v.steer=0; syncVehBox(v); $('vinfo').style.display='none';
   if(MP.play)mpSend({t:'vleave',i:v.idx,x:+v.x.toFixed(2),y:+v.y.toFixed(2),z:+v.z.toFixed(2),yaw:+v.yaw.toFixed(3)});
 }
 function bailOut(){
@@ -1846,7 +1920,7 @@ function interact(){
       if(it.type==='ar'&&P.armor>=100){ toast('Zırhın zaten dolu'); return; }
       if(now-(it.pend||-9)<0.5)return; it.pend=now; mpSend({t:'pick',id:it.id}); return; }
     pickup(it); return; }
-  if(BR.nearVeh){ if(MP.play)mpSend({t:'venter',i:BR.nearVeh.idx}); else enterVehicle(BR.nearVeh); }
+  if(BR.nearVeh){ if(MP.play)mpSend({t:'venter',i:BR.nearVeh.idx,s:BR.nearVeh.occupied?1:0}); else enterVehicle(BR.nearVeh); }
 }
 function driveGround(v,dt){
   const c=VCFG[v.type],th=(keys.KeyW?1:0)-(keys.KeyS?1:0),st=(keys.KeyA?1:0)-(keys.KeyD?1:0);
@@ -1854,14 +1928,14 @@ function driveGround(v,dt){
   v.speed*=Math.exp(-(th===0?0.55:0.08)*dt); if(keys.Space)v.speed*=Math.exp(-3.2*dt);
   v.speed=clamp(v.speed,-c.rev,c.max);
   v.steer+=(st-v.steer)*(1-Math.exp(-9*dt));
-  const sk=clamp(Math.abs(v.speed)/3.5,0,1)*(1-0.5*Math.abs(v.speed)/c.max);
+  let sk=clamp(Math.abs(v.speed)/3.5,0,1)*(1-0.5*Math.abs(v.speed)/c.max); if(v.type==='tank')sk=Math.max(0.5,sk);
   v.yaw+=v.steer*c.turn*sk*(v.speed>=0?1:-1)*dt;
   const nx=v.x-Math.sin(v.yaw)*v.speed*dt,nz=v.z-Math.cos(v.yaw)*v.speed*dt;
   if(!hitsBoxes(nx,nz,0.1,c.h,c.r)){ v.x=nx; v.z=nz; }
   else if(!hitsBoxes(nx,v.z,0.1,c.h,c.r)){ v.x=nx; v.speed*=0.88; }
   else if(!hitsBoxes(v.x,nz,0.1,c.h,c.r)){ v.z=nz; v.speed*=0.88; }
   else{ const imp=Math.abs(v.speed); if(imp>9)crashHurt((imp-8)*2.2); v.speed*=-0.28; }
-  if(Math.abs(v.speed)>5){ for(const f of fighters){ if(f===P||!f.alive||f.air)continue; if(Math.hypot(f.x-v.x,f.z-v.z)<1.9){ damage(f,70+Math.abs(v.speed)*4,P,false); v.speed*=0.8; } } }
+  if(Math.abs(v.speed)>5){ for(const f of fighters){ if(f===P||!f.alive||f.air)continue; if(Math.hypot(f.x-v.x,f.z-v.z)<(v.type==='tank'?2.8:1.9)){ damage(f,(v.type==='tank'?160:70)+Math.abs(v.speed)*4,P,false); v.speed*=(v.type==='tank'?0.92:0.8); } } }
   v.roll=v.type==='bike'?v.steer*clamp(v.speed/c.max,0,1)*0.55:-v.steer*clamp(v.speed/c.max,0,1)*0.07; v.pitchV=0; v.y=0;
   for(const w of v.parts.wheels) w.m.rotation.x-=v.speed*dt/w.r;
   for(const sg of v.parts.steer) sg.rotation.y=v.steer*0.45;
@@ -1899,8 +1973,8 @@ function drivePlane(v,dt){
   v.parts.wheels.forEach(w=>{ w.m.rotation.x-=v.speed*dt/w.r; });
 }
 function driveVehicle(v,dt){
-  if(v.type==='car'||v.type==='bike')driveGround(v,dt); else if(v.type==='heli')driveHeli(v,dt); else drivePlane(v,dt);
-  animVeh(v,dt); placeVeh(v);
+  if(P.seat===1){ animVeh(v,dt); placeVeh(v); }
+  else{ if(v.type==='heli')driveHeli(v,dt); else if(v.type==='plane')drivePlane(v,dt); else driveGround(v,dt); animVeh(v,dt); placeVeh(v); }
   P.x=v.x; P.z=v.z; P.y=v.y+0.2; P.vx=P.vz=0;
   const kmh=Math.round(Math.abs(v.speed)*3.6); const alt=Math.round(v.y);
   const vi=VNAME[v.type]+'<small>'+kmh+' km/s'+((v.type==='heli'||v.type==='plane')?'   İrtifa '+alt+' m':'')+'</small>'; if(hudCache.vi!==vi){ hudCache.vi=vi; $('vinfo').innerHTML=vi; }
@@ -1909,10 +1983,20 @@ function animVeh(v,dt){
   const p=v.parts;
   if(p.rotor)p.rotor.rotation.y+=dt*v.rotor*34; if(p.tail)p.tail.rotation.x+=dt*v.rotor*40;
   if(p.prop)p.prop.rotation.z+=dt*(v.occupied?(10+v.thr*70):0);
+  if(p.turret){ p.turret.rotation.y+=wrapA((v.ty||0)-p.turret.rotation.y)*Math.min(1,dt*14); }
 }
 function vehCamera(dt){
-  const v=P.veh; if(now-lastMouse>1.5){ P.yaw*=Math.exp(-1.5*dt); P.pitch+=(0.12-P.pitch)*(1-Math.exp(-1.5*dt)); }
-  const cfg=VCAM[v.type],ang=v.yaw+P.yaw,pit=clamp(P.pitch,-0.2,1.1),cx=v.x,cy=v.y+cfg.h,cz=v.z;
+  const v=P.veh; if(now-lastMouse>1.5&&!mouseDown){ P.yaw*=Math.exp(-1.5*dt); P.pitch+=(0.12-P.pitch)*(1-Math.exp(-1.5*dt)); }
+  const cfg=VCAM[v.type];
+  if(ARMED[v.type]){
+    const ang=v.yaw+P.yaw, d=cfg.d, p0=0.16, cx=v.x, cy=v.y+cfg.h, cz=v.z;
+    if(P.seat===1||!v.pass) v.ty=P.yaw;
+    camera.position.set(cx+Math.sin(ang)*d*Math.cos(p0),Math.max(0.6,cy+Math.sin(p0)*d+0.5),cz+Math.cos(ang)*d*Math.cos(p0));
+    const el=clamp((P.pitch-0.12)*0.85,-0.45,0.9), L=60;
+    camera.lookAt(cx-Math.sin(ang)*L*Math.cos(el),cy+0.5+Math.sin(el)*L,cz-Math.cos(ang)*L*Math.cos(el));
+    return;
+  }
+  const ang=v.yaw+P.yaw,pit=clamp(P.pitch,-0.2,1.1),cx=v.x,cy=v.y+cfg.h,cz=v.z;
   camera.position.set(cx+Math.sin(ang)*cfg.d*Math.cos(pit),Math.max(0.5,cy+Math.sin(pit)*cfg.d+0.6),cz+Math.cos(ang)*cfg.d*Math.cos(pit));
   camera.lookAt(cx,cy+cfg.look,cz);
 }
@@ -1929,8 +2013,8 @@ function updateNear(dt){
   if(P.alive&&!P.air&&!P.veh){
     let bd=2.4; for(const it of BR.items){ if(!it.alive)continue; const d=Math.hypot(it.x-P.x,it.z-P.z); if(d<bd&&Math.abs(P.y)<3.2){ bd=d; BR.nearItem=it; } }
     if(BR.nearItem) txt='E: Al - '+itemName(BR.nearItem);
-    else{ let bv=1e9; for(const v of BR.vehicles){ if(v.occupied)continue; const d=Math.hypot(v.x-P.x,v.z-P.z); if(d<VRANGE[v.type]&&d<bv&&Math.abs(v.y-P.y)<3){ bv=d; BR.nearVeh=v; } }
-      if(BR.nearVeh) txt='E: Araca bin - '+VNAME[BR.nearVeh.type]; }
+    else{ let bv=1e9; for(const v of BR.vehicles){ if(v.occupied&&!(MP.play&&v.type==='jeep'&&v.driver&&!v.pass))continue; const d=Math.hypot(v.x-P.x,v.z-P.z); if(d<VRANGE[v.type]&&d<bv&&Math.abs(v.y-P.y)<3){ bv=d; BR.nearVeh=v; } }
+      if(BR.nearVeh) txt=BR.nearVeh.occupied?'E: Yolcu olarak bin - '+VNAME[BR.nearVeh.type]:'E: Araca bin - '+VNAME[BR.nearVeh.type]; }
   } else if(P.alive&&P.veh){ const v=P.veh; txt=((v.type==='heli'||v.type==='plane')&&v.y>2.8)?'E: Paraşütle atla (ya da alçalıp in)':'E: Araçtan in'; }
   const pr=$('prompt'); if(txt&&IS_TOUCH_EARLY)txt=txt.replace('E: ','').replace('ile in','düğmesiyle in').replace('sonra E','sonra AL/BİN'); if(txt){ if(pr.textContent!==txt)pr.textContent=txt; pr.style.display='block'; } else pr.style.display='none';
   $('vinfo').style.display=P.veh?'block':'none';
@@ -2245,7 +2329,7 @@ if(IS_TOUCH){
     const veh=pl&&P.veh, air=pl&&P.air&&!P.veh;
     b.toggle('spec',specOn()); { const sb=$('specbar'); if(sb)sb.style.display=specOn()?'block':'none'; }
     b.toggle('inveh',!!veh); b.toggle('inair',!!air);
-    b.toggle('invair',!!(veh&&(veh.type==='heli'||veh.type==='plane')));
+    b.toggle('invair',!!(veh&&(veh.type==='heli'||veh.type==='plane'))); b.toggle('inarmed',!!(veh&&ARMED[veh.type]));
     b.toggle('useok',!!(pl&&mode==='br'&&!air&&P.alive&&($('prompt').style.display==='block'||veh)));
     if(!mouseR) $('tads').classList.remove('on');
     if(!pl||!P.alive){ if(sid!==null)stickEnd(); }
@@ -2354,7 +2438,7 @@ function addRemote(pl){
     const i=pl.id, st={camo:BRKINDS[i%5],vest:[0x4a5a3a,0x5a4a32,0x3a3d40,0x2e2f2e][i%4],helm:[0x3f4a36,0x6b5a3c,0x2d3033,0x1c1d1d][i%4],skin:SKINS[i%5],bal:i%5===0,pack:i%3?[0x3b4030,0x5a4a32,0x2d3033][i%3]:0,col:0x888888};
     f=makeFighter(pl.name,'a',false,false,st,sim?randomWeapon():(MP.mode==='dm'?WBYID.alfa7:WBYID.nobet)); f.side='#'+pl.id; f.css=hslHex((i*0.17)%1);
     if(MP.mode==='br'){ f.air=true; f.canopy=makeCanopy(); f.mesh.add(f.canopy); }
-    if(sim&&MP.mode==='br'){ f.x=rnd(-90,90); f.z=rnd(-90,90); f.y=rnd(115,150); f.yaw=rnd(0,6.28);
+    if(sim&&MP.mode==='br'){ f.x=rnd(-90,90)*BRS; f.z=rnd(-90,90)*BRS; f.y=rnd(300,340); f.yaw=rnd(0,6.28);
       const dd=BR.doors[Math.floor(Math.random()*BR.doors.length)], cxz=navXZ(navFree(navIdx(dd.x+rnd(-3,3),dd.z+rnd(-3,3)))); f.dropTx=cxz[0]; f.dropTz=cxz[1]; }
   } else f=makeFighter(pl.name,pl.team,false,pl.team===me.team);
   f.remote=!sim; f.bot=!!pl.bot; f.id=pl.id; f.kills=pl.kills||0; f.deaths=pl.deaths||0; f.alive=pl.alive!==false; f.fresh=!sim; f.tx=f.x; f.ty=f.y; f.tz=f.z; f.tyaw=f.yaw; f.spd=0; f.wpId=f.wp.id;
@@ -2387,7 +2471,7 @@ function startMP(){
   if(dm){
     if(!BR.built){ buildBRWorld(); setWorld('br'); buildNav(BR.half); createVehicles(); } else setWorld('br');
     mode='br'; BR.over=false; BR.endT=0; BR.place=0; BR.ts=1; BR.total=Object.keys(MP.players).length; BR.alive=BR.total; applyLoadout();
-    zoneInit(); const Z=BR.zone; Z.r=Z.tr=215; Z.cx=Z.cz=Z.tcx=Z.tcz=0; BR.zoneMesh.visible=false;
+    zoneInit(); const Z=BR.zone; Z.r=Z.tr=brZ0(); Z.cx=Z.cz=Z.tcx=Z.tcz=0; BR.zoneMesh.visible=false;
     BR.items=[]; if(BR.itemGrp)while(BR.itemGrp.children.length)BR.itemGrp.remove(BR.itemGrp.children[0]);
     resetVehicles(); for(const v of BR.vehicles){ v.mesh.visible=false; v.occupied=true; syncVehBox(v); }
     score.a=score.o=0; timeLeft=MP.left;
@@ -2400,7 +2484,7 @@ function startMP(){
     if(!BR.built){ buildBRWorld(); setWorld('br'); buildNav(BR.half); createVehicles(); } else setWorld('br');
     mode='br'; BR.over=false; BR.endT=0; BR.place=0; BR.ts=1; LOADOUT=[WBYID.nobet,EMPTY,EMPTY];
     P=makeFighter(me.name,'a',true,false); P.side='#'+MP.id; P.css='#ece8d8'; P.vx=P.vz=P.vy=0; P.veh=null; P.air=true; P.sprint=false; P.gren=1; P.smk=1; P.id=MP.id; me.f=P;
-    P.x=rnd(-60,60); P.z=rnd(-60,60); P.y=140; P.yaw=rnd(0,6.28); P.pitch=-0.45; P.canopy=makeCanopy(); scene.add(P.canopy);
+    P.x=rnd(-60,60)*BRS; P.z=rnd(-60,60)*BRS; P.y=330; P.yaw=rnd(0,6.28); P.pitch=-0.45; P.canopy=makeCanopy(); scene.add(P.canopy);
     P.style={camo:'woodland',vest:0x4a5a3a,helm:0x3f4a36,skin:0xc79b78,bal:false,pack:0x3b4030,col:0x888888};
     fighters.push(P);
     for(const id in MP.players){ const pl=MP.players[id]; if(pl.id!==MP.id)addRemote(pl); }
@@ -2466,7 +2550,7 @@ function mpMsg(m){
     case 'start': MP.phase='play'; MP.mode=m.mode; MP.seed=m.seed; MP.score=m.score; MP.left=m.left; fillPlayers(m.ents); MP.spec=false; startMP(); break;
     case 'st': { if(!MP.play)break; const pl=MP.players[m.id]; if(!pl||!pl.f)break; const f=pl.f; f.tx=m.x; f.ty=m.y; f.tz=m.z; f.tyaw=m.yaw; f.spd=m.s; f.air=!!(m.a||m.iv); f.iv=!!m.iv; if(f.fresh){ f.x=m.x; f.y=m.y; f.z=m.z; f.yaw=m.yaw; f.fresh=false; } setRemoteWeapon(f,m.w); break; }
     case 'bs': { if(!MP.play||MP.host===MP.id)break; for(const q of m.b){ const pl=MP.players[q[0]]; if(!pl||!pl.f||!pl.f.remote)continue; const f=pl.f; f.tx=q[1]; f.ty=q[2]; f.tz=q[3]; f.tyaw=q[4]; f.spd=q[5]; f.air=!!q[6]; if(f.fresh){ f.x=q[1]; f.y=q[2]; f.z=q[3]; f.yaw=q[4]; f.fresh=false; } setRemoteWeapon(f,q[7]); } break; }
-    case 'sh': { const f=pf(m.id); if(!MP.play||!f||f===P)break; tracer(m.ax,m.ay,m.az,m.bx,m.by,m.bz); f.flash.visible=true; f.flashT=0.05; f.firedT=1.2; const w=WBYID[m.w]||WBYID.alfa7; sndShot(0.28/(1+Math.hypot(f.x-P.x,f.z-P.z)/7),w.pitch); break; }
+    case 'sh': { const f=pf(m.id); if(!MP.play||!f||f===P)break; tracer(m.ax,m.ay,m.az,m.bx,m.by,m.bz); if(m.bm)boomFx(m.bx,m.by,m.bz); f.flash.visible=true; f.flashT=0.05; f.firedT=1.2; const w=WBYID[m.w]||WBYID.alfa7; sndShot(0.28/(1+Math.hypot(f.x-P.x,f.z-P.z)/7),w.pitch); break; }
     case 'nade': { const f=pf(m.id); if(MP.play&&f&&f!==P)spawnProj(m.k,f,m.x,m.y,m.z,m.vx,m.vy,m.vz); break; }
     case 'hp': if(MP.play&&P){ if(m.hp<P.hp-0.5){ hurtT=0.7; } P.hp=m.hp; if(m.ar!=null)P.armor=m.ar; } break;
     case 'time': timeLeft=m.left; break;
@@ -2494,11 +2578,17 @@ function mpMsg(m){
     case 'picked': { const it=brItem(m.id); if(!it||!it.alive)break; if(m.by===MP.id&&P&&P.alive)pickup(it); else{ it.alive=false; it.mesh.visible=false; } break; }
     case 'pickno': { const it=brItem(m.id); if(it){ it.alive=false; it.mesh.visible=false; } toast('Eşyayı başkası aldı'); break; }
     case 'drop': if(mode==='br'&&MP.play)dropItem({id:m.id,type:'w',w:WBYID[m.wid],x:m.x,z:m.z}); break;
-    case 'venter': { if(!MP.play||mode!=='br')break; const v=BR.vehicles[m.i]; if(!v)break; if(m.id===MP.id){ if(P&&P.alive&&!P.veh)enterVehicle(v); } else{ v.occupied=true; v.driver=m.id; v.tgt=null; v.fig.g.visible=true; syncVehBox(v); } break; }
+    case 'venter': { if(!MP.play||mode!=='br')break; const v=BR.vehicles[m.i]; if(!v)break;
+      if(m.s===1){ if(m.id===MP.id){ if(P&&P.alive&&!P.veh)enterVehicle(v,1); } else{ v.pass=m.id; if(v.fig2)v.fig2.g.visible=true; } break; }
+      if(m.id===MP.id){ if(P&&P.alive&&!P.veh)enterVehicle(v); } else{ v.occupied=true; v.driver=m.id; v.tgt=null; showDriver(v,true); syncVehBox(v); } break; }
+    case 'vpromo': { if(!MP.play||mode!=='br')break; const v=BR.vehicles[m.i]; if(!v)break; v.pass=0; if(v.fig2)v.fig2.g.visible=false; v.occupied=true; v.driver=m.id; showDriver(v,true); v.tgt=null;
+      if(m.id===MP.id&&P&&P.veh===v){ P.seat=0; v.speed=0; v.steer=0; toast('Sürücü indi, aracı sen kullanıyorsun',2500); } syncVehBox(v); break; }
     case 'vdeny': toast('Araç dolu'); break;
-    case 'vleave': { if(!MP.play||mode!=='br')break; const v=BR.vehicles[m.i]; if(!v)break; v.occupied=false; v.driver=0; v.tgt=null; v.fig.g.visible=false; v.x=m.x; v.y=m.y; v.z=m.z; v.yaw=m.yaw; v.speed=0; syncVehBox(v); placeVeh(v); break; }
-    case 'vfree': { if(!MP.play||mode!=='br')break; const v=BR.vehicles[m.i]; if(!v||P&&P.veh===v)break; v.occupied=false; v.driver=0; v.tgt=null; v.fig.g.visible=false; syncVehBox(v); break; }
-    case 'vst': { if(!MP.play||mode!=='br')break; const v=BR.vehicles[m.i]; if(!v||P&&P.veh===v)break; v.occupied=true; v.driver=v.driver||-1; v.tgt={x:m.x,y:m.y,z:m.z,yaw:m.yaw}; v.pitchV=m.pv; v.roll=m.roll; v.speed=m.spd; v.rotor=m.rot; v.thr=m.thr; v.fig.g.visible=true; break; }
+    case 'vleave': { if(!MP.play||mode!=='br')break; const v=BR.vehicles[m.i]; if(!v)break;
+      if(m.s===1){ if(m.id!==MP.id){ v.pass=0; if(v.fig2)v.fig2.g.visible=false; } break; }
+      v.occupied=false; v.driver=0; v.tgt=null; v.fig.g.visible=false; v.x=m.x; v.y=m.y; v.z=m.z; v.yaw=m.yaw; v.speed=0; syncVehBox(v); placeVeh(v); break; }
+    case 'vfree': { if(!MP.play||mode!=='br')break; const v=BR.vehicles[m.i]; if(!v||P&&P.veh===v)break; v.occupied=false; v.driver=0; v.pass=0; v.tgt=null; v.fig.g.visible=false; if(v.fig2)v.fig2.g.visible=false; syncVehBox(v); break; }
+    case 'vst': { if(!MP.play||mode!=='br')break; const v=BR.vehicles[m.i]; if(!v)break; if(m.g){ if(!(P&&P.veh===v&&P.seat===1))v.ty=m.ty; break; } if(P&&P.veh===v&&P.seat!==1)break; if(!v.pass)v.ty=m.ty; v.occupied=true; v.driver=v.driver||-1; v.tgt={x:m.x,y:m.y,z:m.z,yaw:m.yaw}; v.pitchV=m.pv; v.roll=m.roll; v.speed=m.spd; v.rotor=m.rot; v.thr=m.thr; showDriver(v,true); break; }
   }
 }
 
@@ -2576,7 +2666,7 @@ function frame(t){
     for(const f of fighters) if(!f.isPlayer){ if(f.remote)updateRemote(f,dt); else updateBot(f,dt); }
     if(MP.play){
       MP.sendT-=dt; if(MP.sendT<=0){ MP.sendT=0.066; if(P.alive)mpSend({t:'st',x:+P.x.toFixed(2),y:+P.y.toFixed(2),z:+P.z.toFixed(2),yaw:+P.yaw.toFixed(3),w:LOADOUT[cur].id,s:+Math.hypot(P.vx,P.vz).toFixed(2),a:P.air?1:0,iv:P.veh?1:0}); }
-      if(P.veh){ MP.vstT-=dt; if(MP.vstT<=0){ MP.vstT=0.066; const v=P.veh; mpSend({t:'vst',i:v.idx,x:+v.x.toFixed(2),y:+v.y.toFixed(2),z:+v.z.toFixed(2),yaw:+v.yaw.toFixed(3),pv:+(v.pitchV||0).toFixed(3),roll:+(v.roll||0).toFixed(3),spd:+v.speed.toFixed(2),rot:+(v.rotor||0).toFixed(2),thr:+(v.thr||0).toFixed(2)}); } }
+      if(P.veh){ MP.vstT-=dt; if(MP.vstT<=0){ MP.vstT=0.066; const v=P.veh; if(P.seat===1)mpSend({t:'vst',i:v.idx,g:1,ty:+(v.ty||0).toFixed(3)}); else mpSend({t:'vst',i:v.idx,ty:+(v.ty||0).toFixed(3),x:+v.x.toFixed(2),y:+v.y.toFixed(2),z:+v.z.toFixed(2),yaw:+v.yaw.toFixed(3),pv:+(v.pitchV||0).toFixed(3),roll:+(v.roll||0).toFixed(3),spd:+v.speed.toFixed(2),rot:+(v.rotor||0).toFixed(2),thr:+(v.thr||0).toFixed(2)}); } }
       if(MP.host===MP.id){ MP.bsT-=dt; if(MP.bsT<=0){ MP.bsT=0.08; const b=[]; for(const f of fighters) if(f.bot&&!f.remote&&f.alive) b.push([f.id,+f.x.toFixed(2),+f.y.toFixed(2),+f.z.toFixed(2),+f.yaw.toFixed(3),+(f.speedNow||0).toFixed(1),f.air?1:0,f.wp.id]); if(b.length)mpSend({t:'bs',b}); } }
     }
     P.firedT=Math.max(0,P.firedT-dt);

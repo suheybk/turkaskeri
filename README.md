@@ -79,3 +79,9 @@ yalnızca DoS'u kesiyor, hileyi kesmiyor.
 - Kurucu lobide modu seçer, bot ekler/çıkarır, oyuncu ve botların takımını değiştirir. "Oyunu başlat"a basınca diğer oyunculara teklif gider, 5 saniye içinde oy verirler (oy vermeyen kabul sayılır). Ret sayısı kabulden az değilse teklif düşer; yalnız oyuncu varsa oylama yapılmaz.
 - Ölüm maçı (tek kişilik de var: ana menüden botlarla) (Battle Royale haritasında herkes herkese): ölenler 3 sn sonra rastgele bir noktada yeniden doğar, ilk 40 öldürmeyi yapan kazanır (10 dakikada kimse ulaşamazsa en çok öldüren). Eşya, araç ve çember yok; oyuncunun kendi teçhizatı kullanılır.
 - Battle Royale: dünya, eşyalar ve çember odanın tohumundan türetilir (herkeste aynı). Eşya alma ve araca binme sunucuda hakemlenir.
+
+## Battle Royale haritası ve araçlar
+- Harita ~3,6 kat büyütüldü (570 × 570 m): yeni kasabalar, yollar, daha çok ağaç/kaya/konteyner; çember ve paraşüt irtifası buna göre ölçeklendi.
+- **Tank:** top (patlayıcı mermi, alan hasarı), çarptığını ezer, fareyle namlu yönü.
+- **Makineli jip:** 2 kişilik. Çok oyunculuda ikinci oyuncu yolcu/nişancı olarak binip makineli tüfeği kullanır; sürücü inerse yolcu direksiyona geçer.
+- Helikopter ve uçak da ateş eder.

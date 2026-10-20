@@ -159,7 +159,7 @@ export class Room {
     this.nextId = 1; this.nextBot = 101; this.mode = 'tdm'; this.phase = 'lobby';
     this.score = { a: 0, o: 0 }; this.left = MATCH; this.host = null; this.timer = null; this.tick = 0;
     this.pwFail = { n: 0, until: 0 };
-    this.vote = null; this.picked = new Set(); this.veh = new Map(); this.alive = 0; this.seed = 1;
+    this.vote = null; this.picked = new Set(); this.veh = new Map(); this.veh2 = new Map(); this.alive = 0; this.seed = 1;
   }
   hpFor(e) { return this.mode === 'tdm' ? (e.team === 'o' ? 90 : 100) : 100; }
   ent(id) { return this.players.get(id) || this.bots.get(id); }
@@ -238,7 +238,15 @@ export class Room {
     else if (this.mode === 'tdm') {/* oyun sürer */ }
   }
   stopTimer() { if (this.timer) { clearInterval(this.timer); this.timer = null; } }
-  freeVeh(pid) { for (const [i, o] of [...this.veh]) if (o === pid) { this.veh.delete(i); this.bcast({ t: 'vfree', i }); } }
+  freeVeh(pid) {
+    for (const [i, o] of [...this.veh2]) if (o === pid) { this.veh2.delete(i); this.bcast({ t: 'vleave', i, s: 1, id: pid }); }
+    for (const [i, o] of [...this.veh]) if (o === pid) this.dropDriver(i);
+  }
+  dropDriver(i, pos) {
+    this.veh.delete(i); const q = this.veh2.get(i);
+    if (q != null && this.players.has(q)) { this.veh2.delete(i); this.veh.set(i, q); this.bcast({ t: 'vpromo', i, id: q }); }
+    else { this.veh2.delete(i); this.bcast({ t: 'vfree', i }); }
+  }
 
   /* ---- oylama ve başlatma ---- */
   startVote(p) {
@@ -260,7 +268,7 @@ export class Room {
   }
   startMatch() {
     this.phase = 'play'; this.score = { a: 0, o: 0 }; this.left = this.mode === 'dm' ? MATCH_DM : MATCH; this.seed = (Math.random() * 2147483647) | 0;
-    this.picked.clear(); this.veh.clear();
+    this.picked.clear(); this.veh.clear(); this.veh2.clear();
     for (const e of this.all()) { e.kills = 0; e.deaths = 0; e.alive = true; e.spec = false; e.hp = this.hpFor(e); e.lastHit = 0; e.place = 0; e.armor = 0; }
     this.alive = this.all().length;
     this.bcast({ t: 'start', mode: this.mode, seed: this.seed, left: this.left, score: this.score, ents: this.all().map((e) => this.pub(e)) });
@@ -342,7 +350,7 @@ export class Room {
       case 'sh': {
         if (this.phase !== 'play') return;
         let id = p.id; if (m.bot != null) { if (!isHost || !this.bots.has(num(m.bot))) return; id = num(m.bot); } else if (!p.alive) return;
-        this.bcast({ t: 'sh', id, ax: num(m.ax), ay: num(m.ay), az: num(m.az), bx: num(m.bx), by: num(m.by), bz: num(m.bz), w: sid(m.w) }, p);
+        this.bcast({ t: 'sh', id, ax: num(m.ax), ay: num(m.ay), az: num(m.az), bx: num(m.bx), by: num(m.by), bz: num(m.bz), w: sid(m.w), bm: m.bm ? 1 : 0 }, p);
         break;
       }
       case 'nade': {
@@ -382,18 +390,28 @@ export class Room {
       case 'drop': if (this.mode === 'br' && this.phase === 'play') this.bcast({ t: 'drop', id: sid(m.id), type: sid(m.type), wid: sid(m.wid), x: num(m.x), z: num(m.z) }, p); break;
       case 'venter': {
         if (this.mode !== 'br' || this.phase !== 'play' || !p.alive) return; const i = num(m.i, -1);
-        if (i < 0 || i > 40 || this.veh.has(i)) return this.send(p, { t: 'vdeny', i });
+        if (i < 0 || i > 90) return this.send(p, { t: 'vdeny', i });
+        if (m.s === 1) {
+          if (!this.veh.has(i) || this.veh.get(i) === p.id || this.veh2.has(i)) return this.send(p, { t: 'vdeny', i });
+          this.veh2.set(i, p.id); this.bcast({ t: 'venter', i, id: p.id, s: 1 }); break;
+        }
+        if (this.veh.has(i)) return this.send(p, { t: 'vdeny', i });
         this.veh.set(i, p.id); this.bcast({ t: 'venter', i, id: p.id });
         break;
       }
       case 'vleave': {
-        const i = num(m.i, -1); if (this.veh.get(i) !== p.id) return; this.veh.delete(i);
+        const i = num(m.i, -1);
+        if (m.s === 1) { if (this.veh2.get(i) !== p.id) return; this.veh2.delete(i); this.bcast({ t: 'vleave', i, s: 1, id: p.id }, p); break; }
+        if (this.veh.get(i) !== p.id) return;
         this.bcast({ t: 'vleave', i, x: num(m.x), y: num(m.y), z: num(m.z), yaw: num(m.yaw) }, p);
+        this.dropDriver(i);
         break;
       }
       case 'vst': {
-        const i = num(m.i, -1); if (this.veh.get(i) !== p.id) return;
-        this.bcast({ t: 'vst', i, x: num(m.x), y: num(m.y), z: num(m.z), yaw: num(m.yaw), pv: num(m.pv), roll: num(m.roll), spd: num(m.spd), rot: num(m.rot), thr: num(m.thr) }, p);
+        const i = num(m.i, -1);
+        if (m.g) { if (this.veh2.get(i) !== p.id) return; this.bcast({ t: 'vst', i, g: 1, ty: num(m.ty) }, p); break; }
+        if (this.veh.get(i) !== p.id) return;
+        this.bcast({ t: 'vst', i, x: num(m.x), y: num(m.y), z: num(m.z), yaw: num(m.yaw), pv: num(m.pv), roll: num(m.roll), spd: num(m.spd), rot: num(m.rot), thr: num(m.thr), ty: num(m.ty) }, p);
         break;
       }
     }
