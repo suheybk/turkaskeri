@@ -367,7 +367,7 @@ export class Room {
       /* oyun içi */
       case 'st': {
         if (p.spec) return;
-        this.bcast({ t: 'st', id: p.id, x: num(m.x), y: num(m.y), z: num(m.z), yaw: num(m.yaw), w: sid(m.w), s: num(m.s), a: m.a ? 1 : 0, iv: m.iv ? 1 : 0 }, p);
+        this.bcast({ t: 'st', id: p.id, x: num(m.x), y: num(m.y), z: num(m.z), yaw: num(m.yaw), w: sid(m.w), s: num(m.s), a: m.a ? 1 : 0, iv: m.iv ? 1 : 0, sn: Math.max(0, Math.min(2, num(m.sn) | 0)) }, p);
         break;
       }
       case 'dscore': {

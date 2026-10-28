@@ -150,3 +150,6 @@ yalnızca DoS'u kesiyor, hileyi kesmiyor.
 - Rush başlangıcında her iki takımın helikopteri için en yakın 3 bot (pilot + 2 mürettebat) otomatik atanır; hepsi bindikten sonra birlikte kalkarlar.
 - Rush'ta insan oyuncunun takımının helikopterine yalnız 2 bot (mürettebat) biner ve pilot koltuğunu oyuncuya bekler: E ile bin, kalkınca botlar yerden düşmana ateş eder. 25 sn kimse binmezse botlar iner; oyuncu atlarsa/heli düşerse botlar da iner. Rakip takımın helikopteri 3 botla uçar.
 - Yolcu olarak helikoptere bin: botun kullandığı helikoptere (Rush'ta kendi takımının, Battle Royale'de herhangi biri) yere inikken yaklaşıp E ile binersin, pilot seni bekler (en çok 40 sn). Havada kendi silahınla düşmana ateş edersin; E ile atlarsın. Pilot ölür/iner veya sen ölürsen otomatik inersin. Rush'ta oyuncunun takımının helikopterinde pilot + 1 bot mürettebat bulunur, bir yer sana kalır.
+
+## Çömelme ve yatma
+- **C** çömel, **Z** yat (tekrar basınca kalk; Boşluk/Shift de kaldırır). Çömelmişken hız %55, yatarken %25; koşu ve zıplama yok. Kamera alçalır; alçak sipere (1,2 m) çömelince tamamen saklanabilirsin. Botlar çömelen/yatan oyuncuyu daha zor görür ve vurur. Çok oyunculuda diğer oyuncular duruşunu görür (karakter alçalır). Mobilde sağdaki ÇÖMEL / YAT düğmeleri.
