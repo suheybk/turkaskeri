@@ -94,9 +94,10 @@ body.playing #hud{display:block}
 #menu h1{font-size:clamp(46px,9vw,104px);line-height:.95;letter-spacing:.01em}
 #menu .sub{margin-top:10px;font-size:22px;font-weight:600;color:rgba(236,232,216,.7)}
 .teams{display:flex;gap:16px;margin-top:34px;flex-wrap:wrap;justify-content:center}
-.mapsel,#mapsel{pointer-events:auto;display:flex;gap:6px;justify-content:center;margin:10px 0 4px;flex-wrap:wrap}
-#mapsel button{background:rgba(20,24,20,.7);color:var(--bone);border:1px solid #5d6455;padding:5px 12px;font:inherit;font-size:14px;cursor:pointer;letter-spacing:.04em}
-#mapsel button.on{background:#7fb35f;color:#10140e;border-color:#9bd07a}
+.mapsel,#mapsel,.chips{pointer-events:auto;display:flex;gap:6px;justify-content:center;margin:10px 0 4px;flex-wrap:wrap}
+#clsdesc{text-align:center;font-size:14px;color:#b9c4a8;min-height:18px}
+#mapsel button,.chips button{background:rgba(20,24,20,.7);color:var(--bone);border:1px solid #5d6455;padding:5px 12px;font:inherit;font-size:14px;cursor:pointer;letter-spacing:.04em}
+#mapsel button.on,.chips button.on{background:#7fb35f;color:#10140e;border-color:#9bd07a}
 .team{pointer-events:auto;cursor:pointer;width:290px;padding:18px 20px 20px;text-align:left;color:var(--bone);
   background:var(--smoke);border:0;border-left:8px solid;font-family:inherit}
 .team:hover,.team:focus-visible{background:#363937;outline:2px solid var(--bone);outline-offset:2px}
@@ -373,6 +374,9 @@ body.touch.useok #tuse{display:flex}
   <p class="sub">Terk edilmiş askerî tesiste 4’e 4 takım savaşı</p>
   <div id="lvlstrip"><span id="lvltxt">Seviye 1</span><div class="bar"><i id="lvlbar"></i></div><span id="xptxt"></span></div>
   <button class="gearbtn" id="gearbtn">Teçhizat<em id="newtag" style="display:none">Yeni silah</em></button>
+  <div id="domsel" class="chips"></div>
+  <div id="clssel" class="chips"></div>
+  <div id="clsdesc"></div>
   <div id="mapsel"></div>
   <div class="teams">
     <button class="team a" data-team="a"><b class="stencil">Alfa</b><span>Dengeli piyade. 100 can, standart hız.</span></button>
@@ -409,6 +413,7 @@ body.touch.useok #tuse{display:flex}
   <div class="tb wonly" id="tswap">SİLAH</div>
   <div class="tb sm wonly" id="tfrag">BOMBA</div>
   <div class="tb sm wonly" id="tsmoke">SİS</div>
+  <div class="tb sm wonly" id="tabil">YETENEK</div>
   <div class="tb sm wonly" id="tknife">BIÇAK</div>
   <div class="tb" id="tuse">AL / BİN</div>
   <div class="tb sm" id="tpause">II</div>
@@ -785,7 +790,7 @@ function buildWorldMesh(){
     }
     scaleUV(geo,b.w,b.h,b.d,tile);
     const m=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({map:tex,roughness:rough,metalness:metal}));
-    m.position.set(b.cx,b.h/2,b.cz); m.castShadow=b.kind!=='wall'; m.receiveShadow=true; worldTDM.add(m);
+    m.position.set(b.cx,b.h/2,b.cz); m.castShadow=b.kind!=='wall'; m.receiveShadow=true; worldTDM.add(m); b.mesh=m;
   }
 }
 buildWorldMesh();
@@ -1042,7 +1047,7 @@ function respawn(f){
   const t=TEAM[f.team]; let x,z,tries=0; const dm=BR.dm&&mode==='br';
   if(dm){ [x,z]=dmSpawnPoint(f); } else do{ x=rnd(-10,10); z=t.spawnZ+rnd(-2,2); tries++; }while(blockedAt(x,z,0.6,0)&&tries<30);
   f.x=x;f.z=z;f.y=0;f.yaw=dm?rnd(0,6.28):t.yaw+(f.isPlayer?0:rnd(-0.3,0.3));f.hp=f.maxHp;f.alive=true;f.deadK=0;f.target=null;f.seeing=false;f.path=null;f.cd=0.5;
-  if(f.isPlayer){ f.pitch=0;f.vx=0;f.vz=0;f.vy=0;recoil=0; f.gren=2; f.smk=2; resetAmmo(); cur=0; selectWeapon(0,true); }
+  if(f.isPlayer){ f.pitch=0;f.vx=0;f.vz=0;f.vy=0;recoil=0; f.gren=2; f.smk=2; f.armor=0; resetAmmo(); cur=0; selectWeapon(0,true); applyClass(); }
   else{ f.mesh.visible=true; f.mesh.rotation.x=0; }
 }
 
@@ -1116,12 +1121,12 @@ function damage(target,amt,att,head){
   if(target.hp<=0) kill(target,att,head);
 }
 function kill(t,a,head){
-  t.alive=false; t.deaths++; t.respT=3; t.target=null; a.kills++; if(mode==='tdm')score[a.team]++;
+  t.alive=false; t.deaths++; t.respT=3; t.target=null; a.kills++; if(mode==='tdm'&&!(DOM.on&&!MP.play))score[a.team]++;
   const ac_=a.css||TEAM[a.team].css, tc=t.css||TEAM[t.team].css;
   feed('<span style="color:'+ac_+'">'+a.name+'</span> '+(head?'(kafadan) ':'')+'→ <span style="color:'+tc+'">'+t.name+'</span>');
   if(t.isPlayer){ $('dead').style.display='flex'; $('deadsub').textContent=a.name+' seni vurdu'; }
   if(a.isPlayer) addXP(head?30:20);
-  if(mode==='tdm'){ updateScoreHud(); if(score[a.team]>=TARGET_KILLS) endMatch(); }
+  if(mode==='tdm'){ updateScoreHud(); if(!(DOM.on&&!MP.play)&&score[a.team]>=TARGET_KILLS) endMatch(); }
   else if(BR.dm){ if(a.kills>=40) endDM(); }
   else brOnKill(t,a);
 }
@@ -1197,6 +1202,10 @@ let flashT=0,vmKick=0,adsK=0,bobT=0,underW=false;
 /* ---------- Botlar ---------- */
 function pickGoal(b){
   if(mode==='br'){ pickGoalBR(b); return; }
+  if(DOM.on&&!MP.play&&DOM.flags.length&&Math.random()<0.8){
+    let fl=null,bd=1e9; for(const q of DOM.flags){ const open=q.own!==b.team||Math.abs(q.prog)<0.99; const d=Math.hypot(q.x-b.x,q.z-b.z)+(open?0:60)+Math.random()*25; if(d<bd){bd=d;fl=q;} }
+    if(fl){ setPathTo(b,nearestNode(fl.x+rnd(-3,3),fl.z+rnd(-3,3),true)); return; }
+  }
   const ez=b.team==='a'?-1:1; let best=-1,bs=-1e9;
   for(let k=0;k<3;k++){ const i=Math.floor(Math.random()*NODES.length); const s=Math.random()*26+ez*NODES[i].z*0.55; if(s>bs){bs=s;best=i;} }
   setPathTo(b,best);
@@ -1413,14 +1422,14 @@ function updateHud(dt){
   else{ const m=Math.floor(timeLeft/60),s=Math.floor(timeLeft%60); setT('tm',m+':'+(s<10?'0':'')+s); }
   $('arbar').style.display=P.armor>0?'block':'none'; $('arfill').style.width=Math.min(100,P.armor)+'%';
   const am=ammo[cur]+'/'+reserve[cur]+'/'+(reloadT>0?1:0)+'/'+cur; if(hudCache.am!==am){ hudCache.am=am; updateAmmoHud(); }
-  setT('equip','G Bomba '+(P.gren||0)+'   H Sis '+(P.smk||0)+'   V Bıçak'); hurtT=Math.max(0,hurtT-dt); $('hurt').style.opacity=clamp(hurtT/0.7,0,1)+(P.hp<30&&P.alive?0.25:0);
+  setT('equip','G Bomba '+(P.gren||0)+'   H Sis '+(P.smk||0)+'   V Bıçak'+abilText()); hurtT=Math.max(0,hurtT-dt); $('hurt').style.opacity=clamp(hurtT/0.7,0,1)+(P.hp<30&&P.alive?0.25:0);
   if(hitT>0){ hitT-=dt; if(hitT<=0)$('hitm').style.opacity=0; }
 }
 const rc=$('radar').getContext('2d'); let radT=0, spotT=0;
 function updateSpot(dt){
   spotT-=dt; if(spotT>0)return; spotT=0.3;
   for(const e of fighters){ if(e.side===P.side){e.spotted=false;continue;} e.spotted=false; if(!e.alive)continue;
-    if(e.firedT>0){e.spotted=true;continue;}
+    if(e.firedT>0||e.scanT2>now){e.spotted=true;continue;}
     for(const f of fighters){ if(f.side!==P.side||!f.alive)continue;
       if(Math.hypot(f.x-e.x,f.z-e.z)<50 && visible(f,e)){e.spotted=true;break;} } }
 }
@@ -1431,6 +1440,7 @@ function drawRadar(dt){
   rc.clearRect(0,0,S,S);
   for(const b of BOXES){ if(b.kind==='wall')continue; rc.fillStyle=b.h>2?'rgba(150,154,144,.75)':'rgba(110,114,104,.6)';
     rc.fillRect((b.minx+o)*k,(b.minz+o)*k,b.w*k,b.d*k); }
+  if(DOM.on&&!MP.play) for(const q of DOM.flags){ rc.strokeStyle=q.own?(q.own==='a'?'#4a8fc4':'#e0812f'):'#cfcfcf'; rc.lineWidth=2; rc.beginPath(); rc.arc((q.x+o)*k,(q.z+o)*k,5,0,6.3); rc.stroke(); }
   for(const f of fighters){ if(!f.alive||f.isPlayer)continue; const x=(f.x+o)*k,y=(f.z+o)*k;
     if(f.side===P.side){ rc.fillStyle='#9be28f'; rc.beginPath(); rc.arc(x,y,3.2,0,6.3); rc.fill(); }
     else if(f.spotted){ rc.fillStyle='#e5483a'; rc.beginPath(); rc.moveTo(x,y-4.5); rc.lineTo(x+4.5,y); rc.lineTo(x,y+4.5); rc.lineTo(x-4.5,y); rc.closePath(); rc.fill(); } }
@@ -1460,6 +1470,76 @@ function tintSky(fc){
   const pos=skyMesh.geometry.attributes.position, col=skyMesh.geometry.attributes.color, top=new THREE.Color(0x5f8fc2), hor=new THREE.Color(fc), c=new THREE.Color();
   for(let i=0;i<pos.count;i++){ const y=pos.getY(i)/150, t=Math.pow(Math.max(0,y),0.55); c.copy(hor).lerp(top,t); col.setXYZ(i,c.r,c.g,c.b); }
   col.needsUpdate=true;
+}
+/* ---------- Sınıflar, yıkım ve bayrak modu ---------- */
+const CLASSES=[
+  {id:'asalt',name:'Asalt',ab:'Zırh plakası',cd:40,desc:'Q: +40 zırh. Zırhla başlar.'},
+  {id:'saglik',name:'Sağlıkçı',ab:'Sağlık çantası',cd:25,desc:'Q: 8 m içindeki takım arkadaşlarına ve sana +45 can.'},
+  {id:'destek',name:'Destek',ab:'İkmal',cd:30,desc:'Q: yakındaki takımın cephanesini doldurur.'},
+  {id:'nisanci',name:'Nişancı',ab:'Keşif',cd:25,desc:'Q: 70 m içindeki düşmanları 8 sn radarda işaretler.'},
+  {id:'muhendis',name:'Mühendis',ab:'C4',cd:0,desc:'Q: C4 (2 adet) siperleri yıkar. +2 bomba.'}];
+let myCls=0; try{ myCls=clamp((+window.localStorage.getItem('turkAskeri.cls'))|0,0,CLASSES.length-1); }catch(e){}
+let abilCd=0;
+function applyClass(){
+  abilCd=0; P.c4=0; if(mode!=='tdm')return; const c=CLASSES[myCls];
+  if(c.id==='muhendis'){ P.c4=2; P.gren=(P.gren||0)+2; }
+  if(c.id==='asalt'&&!MP.play)P.armor=25;
+}
+function abilText(){ if(mode!=='tdm')return ''; const c=CLASSES[myCls]; return '   Q '+c.ab+(c.id==='muhendis'?' '+(P.c4||0):(abilCd>0?' '+Math.ceil(abilCd)+'s':' hazır')); }
+function healFx(x,z,col){ burst(x,0.3,z,col,16,3); }
+function refillAmmo(){ ammo=LOADOUT.map(w=>w.mag); reserve=LOADOUT.map(w=>w.res); }
+function useAbility(){
+  if(!P||!P.alive||P.air||P.veh||state!=='play'||mode!=='tdm'||paused)return;
+  const c=CLASSES[myCls];
+  if(c.id==='muhendis'){
+    if((P.c4||0)<=0){ toast('C4 kalmadı'); return; } if(nadeCd>0)return; P.c4--; nadeCd=0.9;
+    camera.updateMatrixWorld(); const o=new THREE.Vector3(),d=new THREE.Vector3(); camera.getWorldPosition(o); camera.getWorldDirection(d);
+    const sx=o.x+d.x*0.6,sy=o.y+d.y*0.6-0.15,sz=o.z+d.z*0.6,svx=d.x*13+P.vx,svy=d.y*13+3.5,svz=d.z*13+P.vz;
+    spawnProj('c4',P,sx,sy,sz,svx,svy,svz); if(MP.play)mpSend({t:'nade',k:'c4',x:sx,y:sy,z:sz,vx:svx,vy:svy,vz:svz}); sndClick(); return; }
+  if(abilCd>0){ toast(c.ab+' '+Math.ceil(abilCd)+' sn sonra'); return; }
+  abilCd=c.cd;
+  if(c.id==='asalt'){ if(MP.play)mpSend({t:'heal',to:MP.id,k:'ar',d:40}); else P.armor=Math.min(100,P.armor+40); healFx(P.x,P.z,0x5ab0ff); toast('Zırh plakası +40'); }
+  else if(c.id==='saglik'){ let n=0;
+    for(const f of fighters){ if(!f.alive||f.air||f.team!==P.team||Math.hypot(f.x-P.x,f.z-P.z)>8)continue; n++; healFx(f.x,f.z,0x6fe06f);
+      if(MP.play){ if(f.id!=null)mpSend({t:'heal',to:f.id,k:'hp',d:45}); } else f.hp=Math.min(f.maxHp,f.hp+45); }
+    toast('Sağlık çantası: '+n+' kişi'); }
+  else if(c.id==='destek'){ refillAmmo(); healFx(P.x,P.z,0x9be28f); if(MP.play)mpSend({t:'gad',k:'ammo',x:+P.x.toFixed(1),z:+P.z.toFixed(1)}); toast('İkmal dağıtıldı'); }
+  else if(c.id==='nisanci'){ let n=0; for(const f of fighters){ if(!f.alive||f.side===P.side||f.air)continue; if(Math.hypot(f.x-P.x,f.z-P.z)<70){ f.scanT2=now+8; f.spotted=true; n++; } } spotT=0; toast('Keşif: '+n+' düşman işaretlendi'); }
+}
+function destroyCover(x,z,r,big){
+  if(mode!=='tdm')return;
+  for(let i=BOX_TDM.length-1;i>=0;i--){ const b=BOX_TDM[i]; const k=b.kind; if(!(k==='crate'||k==='low'||(big&&(k==='cont'||k==='tank'))))continue;
+    const dx=Math.max(b.minx-x,0,x-b.maxx), dz=Math.max(b.minz-z,0,z-b.maxz); if(Math.hypot(dx,dz)>r)continue;
+    BOX_TDM.splice(i,1); const j=BOXES.indexOf(b); if(j>=0)BOXES.splice(j,1);
+    if(b.mesh){ worldTDM.remove(b.mesh); }
+    burst(b.cx,b.h*0.5,b.cz,0x8a7a5a,14,5); burst(b.cx,b.h*0.5,b.cz,0x4a4a4a,8,3); }
+}
+const DOM={on:false,flags:[],tk:0,uiT:0}, DOM_TARGET=100;
+function domInit(){
+  DOM.flags.length=0; DOM.tk=0; DOM.uiT=0;
+  [[-24,0,'A'],[0,0,'B'],[24,0,'C']].forEach(c=>{
+    let pt=null; for(let r=0;r<=14&&!pt;r+=2)for(let a=0;a<8&&!pt;a++){ const x=c[0]+Math.cos(a*0.785)*r,z=c[1]+Math.sin(a*0.785)*r; if(!blockedAt(x,z,1.6,0))pt=[x,z]; }
+    pt=pt||[c[0],c[1]];
+    const g=new THREE.Group(), pole=new THREE.Mesh(new THREE.BoxGeometry(0.12,4.2,0.12),new THREE.MeshStandardMaterial({color:0x4a4d4a}));
+    pole.position.y=2.1; g.add(pole);
+    const cm=new THREE.MeshBasicMaterial({color:0xcfcfcf,side:THREE.DoubleSide}), cloth=new THREE.Mesh(new THREE.PlaneGeometry(1.5,0.95),cm); cloth.position.set(0.8,3.6,0); g.add(cloth);
+    const rm=new THREE.MeshBasicMaterial({color:0xcfcfcf,transparent:true,opacity:0.45,depthWrite:false,side:THREE.DoubleSide}), ring=new THREE.Mesh(new THREE.RingGeometry(4.5,5,40),rm); ring.rotation.x=-Math.PI/2; ring.position.y=0.05; g.add(ring);
+    g.position.set(pt[0],0,pt[1]); worldTDM.add(g);
+    DOM.flags.push({n:c[2],x:pt[0],z:pt[1],prog:0,own:'',cm,rm,cloth});
+  });
+}
+function domUpdate(dt){
+  const GR=new THREE.Color(0xcfcfcf),CA=new THREE.Color(TEAM.a.col),CO=new THREE.Color(TEAM.o.col);
+  for(const fl of DOM.flags){
+    let na=0,no=0; for(const f of fighters){ if(!f.alive||f.air)continue; if(Math.hypot(f.x-fl.x,f.z-fl.z)<5){ if(f.team==='a')na++; else no++; } }
+    const df=na-no; if(df!==0)fl.prog=clamp(fl.prog+Math.sign(df)*Math.min(3,Math.abs(df))*dt*0.22,-1,1);
+    const prev=fl.own; if(fl.prog>=1)fl.own='a'; else if(fl.prog<=-1)fl.own='o'; else if(fl.own==='a'&&fl.prog<=0)fl.own=''; else if(fl.own==='o'&&fl.prog>=0)fl.own='';
+    if(fl.own!==prev)toast('Bayrak '+fl.n+(fl.own?': '+TEAM[fl.own].name+' ele geçirdi':': tarafsız'),1800);
+    const col=GR.clone().lerp(fl.prog>0?CA:CO,Math.abs(fl.prog)); fl.cm.color.copy(col); fl.rm.color.copy(col);
+    fl.cloth.position.y=2.4+1.2*(fl.own?1:Math.abs(fl.prog)*0.8);
+  }
+  DOM.tk+=dt; if(DOM.tk>=2){ DOM.tk-=2; for(const fl of DOM.flags)if(fl.own)score[fl.own]++; updateScoreHud(); if(score.a>=DOM_TARGET||score.o>=DOM_TARGET)endMatch(); }
+  DOM.uiT-=dt; if(DOM.uiT<=0){ DOM.uiT=0.3; $('goal').innerHTML='Bayrak ele geçirme ('+DOM_TARGET+' puan)   |   '+DOM.flags.map(q=>'<b style="color:'+(q.own?TEAM[q.own].css:'#ddd')+'">'+q.n+(q.own?'●':'○')+'</b>').join(' '); }
 }
 /* ---------- Battle Royale dünyası ---------- */
 const BRS=3.2;
@@ -2203,9 +2283,9 @@ function stab(){
     burst(best.x,best.y+1.2,best.z,0x9b1f18,8,3); damage(best,back?200:65,P,false); if(back)toast('Arkadan bıçak!',900); }
 }
 function spawnProj(type,owner,x,y,z,vx,vy,vz){
-  const m=new THREE.Mesh(type==='frag'?new THREE.SphereGeometry(0.1,8,6):new THREE.CylinderGeometry(0.06,0.06,0.2,8),new THREE.MeshStandardMaterial({color:type==='frag'?0x3b4a2c:0x8a8d8f,roughness:0.6,metalness:0.3}));
+  const m=new THREE.Mesh(type==='frag'?new THREE.SphereGeometry(0.1,8,6):type==='c4'?new THREE.BoxGeometry(0.24,0.12,0.18):new THREE.CylinderGeometry(0.06,0.06,0.2,8),new THREE.MeshStandardMaterial({color:type==='frag'?0x3b4a2c:type==='c4'?0x8a6a2a:0x8a8d8f,roughness:0.6,metalness:0.3}));
   m.position.set(x,y,z); m.castShadow=true; scene.add(m);
-  projs.push({type,owner,x,y,z,vx,vy,vz,fuse:type==='frag'?2.6:1.3,mesh:m});
+  projs.push({type,owner,x,y,z,vx,vy,vz,fuse:type==='frag'?2.6:type==='c4'?2.4:1.3,mesh:m});
 }
 function throwNade(type){
   if(!P.alive||P.air||P.veh||state!=='play'||nadeCd>0)return;
@@ -2225,10 +2305,11 @@ function explode(p){
   fm.position.set(p.x,p.y+0.4,p.z); scene.add(fm); booms.push({m:fm,t:0});
   for(const f of fighters){
     if(!f.alive||f.air)continue; if(f!==p.owner&&f.side===p.owner.side)continue;
-    const d=Math.hypot(f.x-p.x,f.y+1-p.y,f.z-p.z); if(d>7.5)continue;
+    const d=Math.hypot(f.x-p.x,f.y+1-p.y,f.z-p.z), R=p.type==='c4'?10:7.5; if(d>R)continue;
     if(d>2.2&&!canSee(p.x,p.y+0.4,p.z,f.x,f.y+1,f.z))continue;
-    damage(f,150*(1-d/7.5),f===p.owner?BOMBA:p.owner,false);
+    damage(f,(p.type==='c4'?260:150)*(1-d/R),f===p.owner?BOMBA:p.owner,false);
   }
+  destroyCover(p.x,p.z,p.type==='c4'?6.5:3.2,p.type==='c4');
 }
 function makeSmoke(x,y,z){
   if(SMOKES.length>=5){ const o=SMOKES.shift(); scene.remove(o.grp); }
@@ -2244,7 +2325,7 @@ function updateProjs(dt){
     const g=groundAt(nx,nz,0.1,p.y);
     if(ny<=g+0.1){ ny=g+0.1; p.vy=Math.abs(p.vy)>2.5?-p.vy*0.4:0; p.vx*=0.72; p.vz*=0.72; }
     p.x=nx; p.y=ny; p.z=nz; p.mesh.position.set(nx,ny,nz); p.mesh.rotation.x+=dt*8; p.fuse-=dt;
-    if(p.fuse<=0){ if(p.type==='frag')explode(p); else{ makeSmoke(p.x,Math.max(0,p.y-0.1),p.z); sndTone(160,0.2,0.05); } scene.remove(p.mesh); p.mesh.geometry.dispose(); projs.splice(i,1); }
+    if(p.fuse<=0){ if(p.type==='frag'||p.type==='c4')explode(p); else{ makeSmoke(p.x,Math.max(0,p.y-0.1),p.z); sndTone(160,0.2,0.05); } scene.remove(p.mesh); p.mesh.geometry.dispose(); projs.splice(i,1); }
   }
   for(let i=booms.length-1;i>=0;i--){ const b=booms[i]; b.t+=dt; const k=b.t/0.28; b.m.scale.setScalar(0.5+k*5.5); b.m.material.opacity=0.8*(1-k); if(k>=1){ scene.remove(b.m); b.m.geometry.dispose(); b.m.material.dispose(); booms.splice(i,1); } }
   for(let i=SMOKES.length-1;i>=0;i--){
@@ -2314,7 +2395,7 @@ $('greset').addEventListener('click',()=>{ prof={xp:0,level:1,seen:1,loadout:DEF
 function clearBots(){ for(const f of fighters){ if(f.mesh)scene.remove(f.mesh); if(f.canopy&&f.canopy.parent)f.canopy.parent.remove(f.canopy); } fighters.length=0; if(P&&P.canopy)scene.remove(P.canopy); if(typeof clearBRThings==='function')clearBRThings(); clearProjs(); }
 function startGame(teamKey){
   BR.dm=false; initAudio(); clearBots(); setTDMMap(soloMap<0?Math.floor(Math.random()*MAPS.length):soloMap); setWorld('tdm'); if(BR.zoneMesh)BR.zoneMesh.visible=false; applyLoadout(); gained=0; sessionUnlocks=[]; lvlQ=[]; lvlBusy=false; $('lvl').style.opacity=0;
-  const en=teamKey==='a'?'o':'a';
+  const en=teamKey==='a'?'o':'a'; DOM.on=soloDom; DOM.flags.length=0;
   score.a=0; score.o=0; timeLeft=MATCH_TIME; hudCache={};
   P=makeFighter('Sen',teamKey,true,false); P.vx=P.vz=P.vy=0; fighters.push(P);
   const mates=teamKey==='a'?NAMES_A:NAMES_O, foes=teamKey==='a'?NAMES_O:NAMES_A;
@@ -2322,6 +2403,7 @@ function startGame(teamKey){
   for(let i=0;i<4;i++) fighters.push(makeFighter(foes[i],en,false,false));
   buildViewmodels(teamKey); resetAmmo();
   for(const f of fighters) respawn(f);
+  if(DOM.on)domInit();
   $('feed').innerHTML=''; $('dead').style.display='none'; $('hint').style.display='none';
   updateScoreHud(); $('prompt').style.display='none'; $('vinfo').style.display='none'; $('goal').textContent='İlk 30 öldürmeye ulaşan kazanır   |   Harita: '+TM.name; $('sa').textContent='Alfa 0'; $('so').textContent='0 Özel Harekât'; state='play'; paused=false; fallback=false; document.body.classList.remove('nolock'); P.pitch=0;
   document.body.classList.add('playing'); $('menu').classList.remove('on'); $('end').classList.remove('on'); $('pause').classList.remove('on');
@@ -2362,7 +2444,13 @@ document.addEventListener('pointerlockchange',()=>{
 });
 document.addEventListener('pointerlockerror',()=>{});
 $('pause').addEventListener('click',()=>{ if(state==='play'){ if(fallback||IS_TOUCH_EARLY){paused=false;$('pause').classList.remove('on');} else lockPointer(); } });
-let soloMap=-1;
+let soloMap=-1, soloDom=false;
+(function(){
+  const mk=(id,names,sel,onSel)=>{ const el=$(id); names.forEach((n,i)=>{ const b=document.createElement('button'); b.textContent=n; if(i===sel)b.className='on'; b.addEventListener('click',()=>{ for(const c of el.children)c.classList.remove('on'); b.classList.add('on'); onSel(i); }); el.appendChild(b); }); };
+  mk('domsel',['Takım savaşı','Bayrak ele geçirme'],0,i=>{ soloDom=i===1; });
+  const cd=()=>{ $('clsdesc').textContent=CLASSES[myCls].name+': '+CLASSES[myCls].desc; }; cd();
+  mk('clssel',CLASSES.map(c=>c.name),myCls,i=>{ myCls=i; cd(); try{ window.localStorage.setItem('turkAskeri.cls',String(i)); }catch(e){} });
+})();
 (function(){ const el=$('mapsel'); const names=['Rastgele'].concat(MAPS.map(m=>m.name));
   names.forEach((n,i)=>{ const b=document.createElement('button'); b.textContent=n; b.className=i===0?'on':''; b.addEventListener('click',()=>{ soloMap=i-1; for(const c of el.children)c.classList.remove('on'); b.classList.add('on'); }); el.appendChild(b); }); })();
 document.querySelectorAll('.team').forEach(b=>b.addEventListener('click',()=>startGame(b.dataset.team)));
@@ -2381,7 +2469,7 @@ window.addEventListener('keydown',e=>{
   if(e.code==='KeyP'&&fallback){ paused=!paused; $('pause').classList.toggle('on',paused); }
   if(paused)return;
   if(e.code==='KeyE')interact();
-  if(e.code==='KeyG')throwNade('frag'); if(e.code==='KeyH')throwNade('smoke'); if(e.code==='KeyV'||e.code==='KeyF')stab();
+  if(e.code==='KeyQ')useAbility(); if(e.code==='KeyG')throwNade('frag'); if(e.code==='KeyH')throwNade('smoke'); if(e.code==='KeyV'||e.code==='KeyF')stab();
   if(e.code==='KeyX')P.pitch=0;
   if(e.code==='KeyR')startReload();
   { const dm=/^Digit(\d)$/.exec(e.code); if(dm){ const wn=+dm[1]-1; if(wn>=0&&wn<LOADOUT.length)selectWeapon(wn); } }
@@ -2477,6 +2565,7 @@ if(IS_TOUCH){
   tap('tswap',()=>selectWeapon((cur+1)%LOADOUT.length));
   tap('tfrag',()=>throwNade('frag'));
   tap('tsmoke',()=>throwNade('smoke'));
+  tap('tabil',()=>useAbility());
   tap('tknife',()=>stab());
   tap('tuse',()=>interact());
   for(const [id,fn] of [['tsp1',()=>specStep(1)],['tsp2',()=>specStep(-1)],['tsp3',()=>{MP.specFp=!MP.specFp;}]]){ const el=$(id); el.addEventListener('pointerdown',e=>{ e.preventDefault(); e.stopPropagation(); if(specOn())fn(); }); }
@@ -2656,7 +2745,7 @@ function startMP(){
     resetVehicles(); buildViewmodels('a'); resetAmmo(); cur=0; selectWeapon(0,true);
     $('goal').textContent=''; $('sa').textContent='Hayatta '+BR.alive;
   }else{
-    setTDMMap((MP.seed>>>0)%MAPS.length); setWorld('tdm'); if(BR.zoneMesh)BR.zoneMesh.visible=false; applyLoadout();
+    DOM.on=false; setTDMMap((MP.seed>>>0)%MAPS.length); setWorld('tdm'); if(BR.zoneMesh)BR.zoneMesh.visible=false; applyLoadout();
     score.a=MP.score.a; score.o=MP.score.o; timeLeft=MP.left;
     P=makeFighter(me.name,me.team,true,false); P.vx=P.vz=P.vy=0; P.id=MP.id; me.f=P; fighters.push(P);
     for(const id in MP.players){ const pl=MP.players[id]; if(pl.id!==MP.id)addRemote(pl); }
@@ -2714,6 +2803,7 @@ function mpMsg(m){
     case 'st': { if(!MP.play)break; const pl=MP.players[m.id]; if(!pl||!pl.f)break; const f=pl.f; f.tx=m.x; f.ty=m.y; f.tz=m.z; f.tyaw=m.yaw; f.spd=m.s; f.air=!!(m.a||m.iv); f.iv=!!m.iv; if(f.fresh){ f.x=m.x; f.y=m.y; f.z=m.z; f.yaw=m.yaw; f.fresh=false; } setRemoteWeapon(f,m.w); break; }
     case 'bs': { if(!MP.play||MP.host===MP.id)break; for(const q of m.b){ const pl=MP.players[q[0]]; if(!pl||!pl.f||!pl.f.remote)continue; const f=pl.f; f.tx=q[1]; f.ty=q[2]; f.tz=q[3]; f.tyaw=q[4]; f.spd=q[5]; f.air=!!q[6]; if(f.fresh){ f.x=q[1]; f.y=q[2]; f.z=q[3]; f.yaw=q[4]; f.fresh=false; } setRemoteWeapon(f,q[7]); } break; }
     case 'sh': { const f=pf(m.id); if(!MP.play||!f||f===P)break; tracer(m.ax,m.ay,m.az,m.bx,m.by,m.bz); if(m.bm)boomFx(m.bx,m.by,m.bz); f.flash.visible=true; f.flashT=0.05; f.firedT=1.2; const w=WBYID[m.w]||WBYID.alfa7; sndShot(0.28/(1+Math.hypot(f.x-P.x,f.z-P.z)/7),w.pitch); break; }
+    case 'gad': { const f=pf(m.id); if(MP.play&&P&&P.alive&&f&&f!==P&&f.team===P.team&&m.k==='ammo'&&Math.hypot(m.x-P.x,m.z-P.z)<8){ refillAmmo(); toast('İkmal alındı'); } break; }
     case 'nade': { const f=pf(m.id); if(MP.play&&f&&f!==P)spawnProj(m.k,f,m.x,m.y,m.z,m.vx,m.vy,m.vz); break; }
     case 'hp': if(MP.play&&P){ if(m.hp<P.hp-0.5){ hurtT=0.7; } P.hp=m.hp; if(m.ar!=null)P.armor=m.ar; } break;
     case 'time': timeLeft=m.left; break;
@@ -2825,6 +2915,7 @@ function frame(t){
   const dt=Math.min(0.05,(t-last)/1000); last=t; now+=dt;
   if(state==='play'&&(!paused||MP.play)&&P){
     timeLeft-=dt; if(timeLeft<=0){ timeLeft=0; if(!MP.play)endMatch(); }
+    if(abilCd>0)abilCd-=dt; if(DOM.on&&mode==='tdm'&&!MP.play&&state==='play')domUpdate(dt);
     updatePlayer(dt);
     for(const f of fighters) if(!f.isPlayer){ if(f.remote)updateRemote(f,dt); else updateBot(f,dt); }
     if(MP.play){
@@ -2845,7 +2936,7 @@ function frame(t){
   renderer.render(scene,camera);
 }
 buildViewmodels('a'); refreshMenuLevel();
-window.__TA={setTDMMap,NODES,nearestNode,findPath,ground:(x,z,r,y)=>groundAt(x,z,r,y),blocked:(x,z,r,y)=>blockedAt(x,z,r,y),BOXES,get MP(){return MP;},mpMsg,get mode(){return mode;},addXP,get prof(){return prof;},WEAP,DBG,fighters,get P(){return P;},scene,camera,BR};
+window.__TA={DOM,useAbility,get abilCd(){return abilCd;},score,destroyCover,BOX_TDM,setTDMMap,NODES,nearestNode,findPath,ground:(x,z,r,y)=>groundAt(x,z,r,y),blocked:(x,z,r,y)=>blockedAt(x,z,r,y),BOXES,get MP(){return MP;},mpMsg,get mode(){return mode;},addXP,get prof(){return prof;},WEAP,DBG,fighters,get P(){return P;},scene,camera,BR};
 requestAnimationFrame(frame);
 })();
 </script>

@@ -95,3 +95,8 @@ yalnızca DoS'u kesiyor, hileyi kesmiyor.
 ### Takım savaşı haritaları
 - 5 harita: Üs (orijinal), Depo, Köy, Rafineri, Geçit. Menüden seçilir ya da "Rastgele"; çok oyunculuda harita oda tohumundan (seed) belirlenir, herkeste aynıdır.
 - Yeni haritaların bot yol noktaları otomatik üretilir (ızgara + görüş hattı).
+
+### Sınıflar, yıkım ve bayrak modu
+- 5 sınıf (menüden seçilir, **Q** tuşu / mobilde YETENEK): Asalt (zırh plakası), Sağlıkçı (yakındaki takıma +45 can), Destek (cephane ikmali), Nişancı (düşman keşfi), Mühendis (2 C4, +2 bomba). Sağlık/zırh/ikmal çok oyunculuda sunucu üzerinden (`heal`, `gad`) çalışır.
+- Yıkılabilir siper: bomba sandık ve alçak siperleri, C4 konteyner ve tankları da yıkar (yalnızca takım savaşı haritaları).
+- Bayrak ele geçirme (A-B-C): yalnızca tek oyunculuda; 100 puana ilk ulaşan kazanır, botlar bayrak hedefler.
