@@ -385,6 +385,7 @@ export class Room {
       case 'rarm': if (this.phase === 'play' && this.dom === 4 && p.alive) this.bcast({ t: 'rarm', id: p.id, on: m.on ? 1 : 0, i: num(m.i, -1) | 0 }, p); break;
       case 'rst': if (isHost && this.phase === 'play' && this.dom === 4 && Array.isArray(m.ob)) this.bcast({ t: 'rst', tk: num(m.tk), st: num(m.st) | 0, ob: m.ob.slice(0, 4).map((q) => [num(q[0]) | 0, num(q[1]), num(q[2]), num(q[3])]) }, p); break;
       case 'fin': if (isHost && this.phase === 'play' && this.dom === 4) { this.score = m.w === 'a' ? { a: 2, o: 1 } : { a: 0, o: 1 }; this.bcast({ t: 'dsc', score: this.score }); this.endMatch(); } break;
+      case 'rider': if (this.phase === 'play' && p.alive) this.bcast({ t: 'rider', i: num(m.i, -1) | 0, id: p.id, on: m.on ? 1 : 0 }, p); break;
       case 'dfl': if (isHost && this.phase === 'play' && this.dom && Array.isArray(m.fl)) this.bcast({ t: 'dfl', fl: m.fl.slice(0, 8).map((q) => [num(q[0]), q[1] === 'a' ? 'a' : q[1] === 'o' ? 'o' : '']) }, p); break;
       case 'bs': if (isHost && this.phase === 'play' && Array.isArray(m.b)) this.bcast({ t: 'bs', b: m.b.slice(0, 70), v: Array.isArray(m.v) ? m.v.slice(0, 24) : [] }, p); break;
       case 'sh': {
