@@ -140,3 +140,6 @@ yalnızca DoS'u kesiyor, hileyi kesmiyor.
 - Büyük savaş ve Rush'ta botlar yakındaki boş araca biner (Rush'ta yalnız saldırganlar), hedefe sürer, tank/jip/helikopterden ateş eder, ezer; 45 sn sonra iner, ölünce araçtan düşer. Çok oyunculuda host sürer, araç durumu `bs` mesajıyla yayılır.
 - Her üste helikopter var (W/S ileri-geri, Boşluk/Shift yükseklik); harita sınırı içinde kalır.
 - Rush için iki yeni 340×340 harita: "Geniş Vadi" ve "Büyük Liman"; Rush süresi 15 dk, bu haritalarda ekstra tank/jip var.
+
+## UH-60 Kara Şahin helikopteri
+- Helikopter modeli koyu renkli UH-60 (Kara Şahin) olarak yenilendi: dört kanatlı ana rotor, eğik kuyruk dikmesi ve kırmızı-beyaz yuvarlak işaret, kayar kapı panelleri, kısa kanatçık ve silah kapsülleri. Battle Royale ve Rush/Büyük savaştaki tüm helikopterlerde aynı model kullanılır.
