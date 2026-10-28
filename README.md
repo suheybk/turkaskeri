@@ -105,3 +105,7 @@ yalnızca DoS'u kesiyor, hileyi kesmiyor.
 - 220 m x 220 m iki harita (Kuşatma, Liman; sabit tohumla üretilir), 7 bayrak, her takım 500 bilet. Ölüm 1 bilet, bayrak çoğunluğu rakibin biletini eritir; biletleri biten kaybeder (süre 10 dk).
 - Solo: 31 + 32 bot. Çok oyunculu: kurucu botları yönetir, sunucu bilet tutar (`dscore`, `dsc`), lobide "Büyük savaş 32v32".
 - Botlar 2 m'lik gezinme ızgarası (A*) ile yürür; ölenler sahip olunan bayraklarda veya üste doğar.
+
+### Sınıf silah kısıtı ve aksesuarlar
+- Takım savaşı / bayrak / büyük savaşta silahlar sınıfa göre gelir (Asalt: tüfekler, Sağlıkçı: karabina/SMG, Destek: ağır makineli + tüfek, Nişancı: nişancı tüfekleri, Mühendis: SMG/av tüfeği); sınıfın ilk silahı seviyeden bağımsız açıktır. Yanında her zaman tabanca.
+- Silah başına öldürmeyle aksesuar açılır: 15 öldürme dikey kabza, 40 uzun şarjör, 80 susturucu; sonraki maçta otomatik takılır. Sayaçlar profile (`wk`) kaydedilir.

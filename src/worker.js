@@ -79,7 +79,8 @@ const randHex = (n) => hex(crypto.getRandomValues(new Uint8Array(n)));
 const cleanProf = (p) => {
   const n = (v, a, b, d) => { v = Math.floor(+v); return Number.isFinite(v) ? Math.min(b, Math.max(a, v)) : d; };
   const lo = Array.isArray(p && p.loadout) ? p.loadout.slice(0, 3).map((x) => String(x).slice(0, 20)) : null;
-  return { xp: n(p && p.xp, 0, 1e6, 0), level: n(p && p.level, 1, 20, 1), seen: n(p && p.seen, 1, 20, 1), loadout: lo };
+  const wk = {}; if (p && p.wk && typeof p.wk === 'object') for (const k of Object.keys(p.wk).slice(0, 30)) wk[String(k).slice(0, 20)] = n(p.wk[k], 0, 100000, 0);
+  return { xp: n(p && p.xp, 0, 1e6, 0), level: n(p && p.level, 1, 20, 1), seen: n(p && p.seen, 1, 20, 1), loadout: lo, wk };
 };
 
 export class Accounts {
