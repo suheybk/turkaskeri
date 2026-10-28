@@ -130,3 +130,8 @@ yalnızca DoS'u kesiyor, hileyi kesmiyor.
 - Lobi/menüde "Rush": Alfa saldırır (80 bilet), Özel Harekât savunur. Büyük harita, 2 aşama × 2 M-COM.
 - M-COM'un 3.5 m yakınında E'yi basılı tut: saldırgan 5 sn'de kurar, 30 sn fitil yanar; savunma 4 sn basılı tutarak etkisizleştirir. Aşamadaki tüm M-COM'lar imha olursa sonraki aşama; son aşama biterse Alfa kazanır. Bilet biterse veya süre dolarsa savunma kazanır.
 - Çok oyunculu: host durumu hesaplar (`rst`), oyuncular tutma bilgisini `rarm` ile yollar, bitiş `fin`.
+
+## Büyük savaş ve Rush araçları
+- Büyük savaş (32v32) ve Rush haritalarında her takımın üssünde tank, 2 makineli jip, cip ve motosiklet; ortada 2 cip bulunur. E ile bin/in; jip ve tankta ikinci koltuk (yolcu/nişancı) vardır.
+- Araç sistemi Battle Royale ile aynıdır (aynı sürüş, silah ve çok oyunculu `venter/vleave/vst` mesajları); araçlar maç başında yeniden kurulur.
+- Sınırlar: araçların canı yoktur (patlatılamaz), botlar araç kullanmaz, helikopter/uçak bu modlarda yok.

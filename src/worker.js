@@ -441,7 +441,7 @@ export class Room {
       }
       case 'drop': if (this.mode === 'br' && this.phase === 'play') this.bcast({ t: 'drop', id: sid(m.id), type: sid(m.type), wid: sid(m.wid), x: num(m.x), z: num(m.z) }, p); break;
       case 'venter': {
-        if (this.mode !== 'br' || this.phase !== 'play' || !p.alive) return; const i = num(m.i, -1);
+        if (!(this.mode === 'br' || (this.mode === 'tdm' && (this.dom === 2 || this.dom === 4))) || this.phase !== 'play' || !p.alive) return; const i = num(m.i, -1);
         if (i < 0 || i > 90) return this.send(p, { t: 'vdeny', i });
         if (m.s === 1) {
           if (!this.veh.has(i) || this.veh.get(i) === p.id || this.veh2.has(i)) return this.send(p, { t: 'vdeny', i });
