@@ -1228,7 +1228,7 @@ function vehShoot(){
   let ox,oy,oz,dmg,spr;
   if(ty==='tank'){ ox=v.x+thx*4; oy=v.y+2.3; oz=v.z+thz*4; fireCd=1.7; spr=0.004; }
   else if(ty==='jeep'){ ox=v.x+thx*0.9; oy=v.y+2.0; oz=v.z+thz*0.9; fireCd=1/12; dmg=20; spr=0.014; }
-  else{ const fw={x:-Math.sin(v.yaw),z:-Math.cos(v.yaw)}; const side=(vehGunSide=-vehGunSide)*1.1; ox=v.x+fw.x*3+Math.cos(v.yaw)*side; oy=v.y+0.9; oz=v.z+fw.z*3-Math.sin(v.yaw)*side; fireCd=1/11; dmg=22; spr=0.012; }
+  else{ const fw={x:-Math.sin(v.yaw),z:-Math.cos(v.yaw)}; const side=(vehGunSide=-vehGunSide)*1.1; ox=v.x+fw.x*4.5+Math.cos(v.yaw)*side; oy=v.y+1.3; oz=v.z+fw.z*4.5-Math.sin(v.yaw)*side; fireCd=1/11; dmg=22; spr=0.012; }
   const d=new THREE.Vector3(Tx-ox,Ty-oy,Tz-oz).normalize(); d.x+=rnd(-spr,spr); d.y+=rnd(-spr,spr); d.z+=rnd(-spr,spr); d.normalize();
   const r=trace(ox,oy,oz,d.x,d.y,d.z,300,P.side); let gh=false;
   if(d.y<-1e-4){ const tg=-oy/d.y; if(tg>0&&tg<r.t){ r.t=tg; r.f=null; gh=true; } }
@@ -1834,7 +1834,7 @@ function ruUpdate(dt){
 
 
 /* ---------- Helikoptere yolcu olarak bin (kendi silahınla ateş et) ---------- */
-function rideSpot(v){ const c=Math.cos(v.yaw),sn=Math.sin(v.yaw); return [v.x+c*1.6+sn*0.4, v.y+0.35, v.z-sn*1.6+c*0.4]; }
+function rideSpot(v){ const c=Math.cos(v.yaw),sn=Math.sin(v.yaw); return [v.x+c*2.5+sn*0.6, v.y+0.5, v.z-sn*2.5+c*0.6]; }
 function rideEnter(v){
   P.ride=v; v.riders=v.riders||{}; v.riders[MP.id||'me']=1; if(MP.play)mpSend({t:'rider',i:v.idx,on:1});
   mouseDown=false; mouseR=false; adsK=0; toast('Yolcu koltuğu: kendi silahınla ateş et. E: atla',3500); sndClick();
@@ -1902,11 +1902,11 @@ function botVehUpdate(b,dt){
   const gx=b.vgoal[0], gz=b.vgoal[1], want=Math.atan2(-(gx-v.x),-(gz-v.z)), dy=wrapA(want-v.yaw);
   const heli=ty==='heli';
   if(heli){
-    const landing=b.vt>50, rid=Object.values(v.riders||{}).some(Boolean), hold=(v.waitRider&&!rid&&b.vt<40)||b.vt<((v.crewWant&&(v.crew||0)<v.crewWant)?20:6), ty_=(landing||hold)?0:14;
+    const landing=b.vt>50, rid=Object.values(v.riders||{}).some(Boolean), hold=(v.waitRider&&!rid&&b.vt<40)||b.vt<((v.crewWant&&(v.crew||0)<v.crewWant)?20:6), ty_=(landing||hold)?0:18;
     v.rotor=Math.min(1,v.rotor+dt*0.5);
     v.y+=clamp(ty_-v.y,-5,4)*Math.min(1,dt*1.5); if(v.y<0)v.y=0;
     v.yaw+=clamp(dy,-0.9,0.9)*dt*1.3;
-    const sp=(v.y>9&&!landing&&!hold)?(Math.abs(dy)<0.7?22:6):0; v.speed+=(sp-v.speed)*Math.min(1,dt*0.8);
+    const sp=(v.y>12&&!landing&&!hold)?(Math.abs(dy)<0.7?22:6):0; v.speed+=(sp-v.speed)*Math.min(1,dt*0.8);
     const HB=mode==='br'?BR.half:MH; v.x=clamp(v.x-Math.sin(v.yaw)*v.speed*dt,-HB+3,HB-3); v.z=clamp(v.z-Math.cos(v.yaw)*v.speed*dt,-HB+3,HB-3);
     v.pitchV=-(v.speed/30)*0.22; v.roll=0;
     if(landing&&v.y<0.6){ botExit(b,false); return; }
@@ -2419,11 +2419,11 @@ function pickup(it){
 /* ---------- Araçlar ---------- */
 const VNAME={car:'Askerî cip',bike:'Motosiklet',heli:'Helikopter',plane:'Uçak',jeep:'Makineli jip',tank:'Tank'};
 const ARMED={heli:1,plane:1,jeep:1,tank:1};
-const VRANGE={car:3.6,bike:2.8,heli:5.2,plane:6.2,jeep:4.2,tank:5.2};
+const VRANGE={car:3.6,bike:2.8,heli:7.6,plane:6.2,jeep:4.2,tank:5.2};
 const VCFG={car:{acc:17,brake:38,max:31,rev:9,turn:1.75,r:1.5,h:1.8,wr:0.42},bike:{acc:21,brake:34,max:37,rev:6,turn:2.4,r:0.8,h:1.5,wr:0.34},
   jeep:{acc:18,brake:38,max:30,rev:9,turn:1.85,r:1.6,h:1.9,wr:0.45},tank:{acc:8,brake:30,max:13,rev:5,turn:1.15,r:2.5,h:2.6,wr:0.5}};
-const VCAM={car:{d:7.5,h:1.6,look:0.4},bike:{d:5.5,h:1.4,look:0.5},heli:{d:15,h:2.5,look:1},plane:{d:15,h:2.4,look:1},jeep:{d:8.5,h:2.2,look:1},tank:{d:12,h:3.4,look:1}};
-const VDIM={car:[1.0,2.1,1.9],bike:[0.45,1.1,1.2],heli:[1.5,3.4,3.2],plane:[4.6,3.8,2.6],jeep:[1.1,2.3,2.0],tank:[1.9,3.3,2.7]};
+const VCAM={car:{d:7.5,h:1.6,look:0.4},bike:{d:5.5,h:1.4,look:0.5},heli:{d:21,h:3.6,look:1.2},plane:{d:15,h:2.4,look:1},jeep:{d:8.5,h:2.2,look:1},tank:{d:12,h:3.4,look:1}};
+const VDIM={car:[1.0,2.1,1.9],bike:[0.45,1.1,1.2],heli:[2.3,5.1,4.8],plane:[4.6,3.8,2.6],jeep:[1.1,2.3,2.0],tank:[1.9,3.3,2.7]};
 const VHELP={jeep:'W/S gaz-fren, A/D direksiyon, Boşluk el freni. Sol tık: makineli tüfek (fareyle nişan). Yanına bir arkadaşın yolcu/nişancı olarak binebilir. E ile in',tank:'W/S ileri-geri, A/D dön, Boşluk fren. Sol tık: top (patlayıcı mermi), fareyle namlu yönü. Çarptığını ezer. E ile in',car:'W/S gaz-fren, A/D direksiyon, Boşluk el freni, E ile in',bike:'W/S gaz-fren, A/D direksiyon, Boşluk fren, E ile in',
   heli:'W/S ileri-geri, A/D dön, Boşluk yüksel, Shift alçal. Sol tık: ateş. Yerdeyken E ile in, havadayken E ile paraşütle atla',plane:'W/S gaz, A/D dön, Boşluk burun yukarı, Shift burun aşağı. Sol tık: ateş. Hız 24 üstünde havalanır. Yerdeyken E ile in, havadayken E ile paraşütle atla'};
 function buildVehicleMesh(type){
@@ -2505,7 +2505,7 @@ function buildVehicleMesh(type){
     rg.add(new THREE.Mesh(mergeGeos(bl),ACCM)); g.add(rg); P_.rotor=rg;
     const tg=new THREE.Group(); tg.position.set(0.3,3.3,7.15); const tb=[]; for(let k=0;k<4;k++){ const b=new THREE.BoxGeometry(0.04,1.0,0.2); b.translate(0,0.5,0); tb.push(bake(b,0,0,0,k*Math.PI/2,0,0,1,1,1,K)); }
     tg.add(new THREE.Mesh(mergeGeos(tb),ACCM)); g.add(tg); P_.tail=tg;
-    P_.seat={x:0,y:1.35,z:-1.2};
+    P_.seat={x:0,y:1.35,z:-1.2}; g.scale.setScalar(1.5);
   } else {
     const W=0xdedad0,R=0xb02a22,D=0x222322;
     body.push(cy(0.28,0.55,6.2,0,1.25,0.4,Math.PI/2,0,0,W,14),cy(0.5,0.52,0.9,0,1.25,-2.9,Math.PI/2,0,0,0x333333,14),sp(0.22,0,1.25,-3.45,1,1,1.3,R),
@@ -2622,7 +2622,7 @@ function driveHeli(v,dt){
   v.yawRate+=(st*1.25-v.yawRate)*(1-Math.exp(-3*dt)); v.yaw+=v.yawRate*dt;
   v.vy+=((lift?up*9:Math.min(0,up*9))-v.vy)*(1-Math.exp(-1.6*dt));
   const nx=v.x-Math.sin(v.yaw)*v.speed*dt,nz=v.z-Math.cos(v.yaw)*v.speed*dt; let ny=Math.min(150,v.y+v.vy*dt);
-  if(!hitsBoxes(nx,nz,ny+0.2,ny+3.6,2.0)){ v.x=nx; v.z=nz; } else{ const imp=Math.abs(v.speed); if(imp>8)crashHurt((imp-6)*2.5); v.speed*=-0.25; }
+  if(!hitsBoxes(nx,nz,ny+0.2,ny+5.4,3.0)){ v.x=nx; v.z=nz; } else{ const imp=Math.abs(v.speed); if(imp>8)crashHurt((imp-6)*2.5); v.speed*=-0.25; }
   const g=groundAt(v.x,v.z,1.6,v.y);
   if(ny<=g){ if(v.vy<-9)crashHurt((-v.vy-8)*4); ny=g; if(v.vy<0)v.vy=0; }
   const HB=mode==='br'?BR.half:MH; v.y=ny; v.x=clamp(v.x,-HB+3,HB-3); v.z=clamp(v.z,-HB+3,HB-3);
