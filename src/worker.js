@@ -397,7 +397,7 @@ export class Room {
         if (!v.bot) this.send(v, { t: 'hp', hp: v.hp, ar: v.armor });
         break;
       }
-      case 'gad': if (this.phase === 'play' && p.alive && this.mode === 'tdm') this.bcast({ t: 'gad', id: p.id, k: 'ammo', x: num(m.x), z: num(m.z) }, p); break;
+      case 'gad': if (this.phase === 'play' && p.alive && this.mode === 'tdm') this.bcast({ t: 'gad', id: p.id, k: m.k === 'rally' ? 'rally' : 'ammo', x: num(m.x), z: num(m.z) }, p); break;
       /* Battle Royale: eşya ve araç */
       case 'pick': {
         if (this.mode !== 'br' || this.phase !== 'play' || !p.alive) return; const id = sid(m.id);

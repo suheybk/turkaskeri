@@ -34,6 +34,9 @@ body.playing #hud{display:block}
 #top .tm{min-width:84px;text-align:center;color:var(--bone)}
 #goal{position:absolute;top:calc(58px + var(--sat));left:50%;transform:translateX(-50%);
   font-size:15px;font-weight:600;color:rgba(236,232,216,.6)}
+#squad{position:absolute;top:calc(186px + var(--sat));left:calc(10px + var(--sal));font-size:13px;line-height:1.35;color:#dfe8d2;text-shadow:0 1px 2px #000;pointer-events:none;min-width:130px}
+#squad div{display:flex;gap:6px;align-items:center} #squad i{display:block;height:4px;background:#7fb35f;margin-top:1px} #squad .d{opacity:.4}
+body.touch #squad{top:calc(124px + var(--sat));font-size:11px}
 #radar{position:absolute;top:calc(10px + var(--sat));left:calc(10px + var(--sal));
   width:168px;height:168px;border:2px solid rgba(236,232,216,.25);background:rgba(14,17,15,.55)}
 #feed{position:absolute;top:calc(10px + var(--sat));right:calc(10px + var(--sar));
@@ -285,6 +288,7 @@ body.touch.useok #tuse{display:flex}
   <div id="top"><div class="sa" id="sa">Alfa 0</div><div class="tm stencil" id="tm">6:00</div><div class="so" id="so">0 Özel Harekât</div></div>
   <div id="goal">İlk 30 öldürmeye ulaşan kazanır</div>
   <canvas id="radar" width="168" height="168"></canvas>
+  <div id="squad"></div>
   <div id="feed"></div>
   <div id="vitals"><div id="hpnum">100</div><div id="hpbar"><div id="hpfill"></div></div><div id="arbar"><div id="arfill"></div></div></div>
   <div id="ammo"><div id="ammonum">30<small> / 120</small></div><div id="wname"></div>
@@ -414,6 +418,7 @@ body.touch.useok #tuse{display:flex}
   <div class="tb sm wonly" id="tfrag">BOMBA</div>
   <div class="tb sm wonly" id="tsmoke">SİS</div>
   <div class="tb sm wonly" id="tabil">YETENEK</div>
+  <div class="tb sm wonly" id="trally">TOPLAN</div>
   <div class="tb sm wonly" id="tknife">BIÇAK</div>
   <div class="tb" id="tuse">AL / BİN</div>
   <div class="tb sm" id="tpause">II</div>
@@ -1075,7 +1080,7 @@ function dmSpawnPoint(f){
 }
 function respawn(f){
   const t=TEAM[f.team]; let x,z,tries=0; const dm=BR.dm&&mode==='br';
-  if(dm){ [x,z]=dmSpawnPoint(f); } else if(CQ.on&&mode==='tdm'){ [x,z]=cqSpawn(f); } else do{ x=rnd(-10,10); z=t.spawnZ+rnd(-2,2); tries++; }while(blockedAt(x,z,0.6,0)&&tries<30);
+  if(dm){ [x,z]=dmSpawnPoint(f); } else if(mode==='tdm'&&squadSpawn(f)){ [x,z]=SQ._sp; } else if(CQ.on&&mode==='tdm'){ [x,z]=cqSpawn(f); } else do{ x=rnd(-10,10); z=t.spawnZ+rnd(-2,2); tries++; }while(blockedAt(x,z,0.6,0)&&tries<30);
   f.x=x;f.z=z;f.y=0;f.yaw=dm?rnd(0,6.28):t.yaw+(f.isPlayer?0:rnd(-0.3,0.3));f.hp=f.maxHp;f.alive=true;f.deadK=0;f.target=null;f.seeing=false;f.path=null;f.cd=0.5;
   if(f.isPlayer){ f.pitch=0;f.vx=0;f.vz=0;f.vy=0;recoil=0; f.gren=2; f.smk=2; f.armor=0; resetAmmo(); cur=0; selectWeapon(0,true); applyClass(); }
   else{ f.mesh.visible=true; f.mesh.rotation.x=0; }
@@ -1232,6 +1237,7 @@ let flashT=0,vmKick=0,adsK=0,bobT=0,underW=false;
 /* ---------- Botlar ---------- */
 function pickGoal(b){
   if(mode==='br'){ pickGoalBR(b); return; }
+  if(b.sq&&!b.sqLead&&Math.random()<0.3){ const ld=fighters.find(f=>f.sq===b.sq&&f.sqLead&&f.alive&&f!==b); if(ld){ if(navMode()){ if(now-(b.pathAt||0)<0.6)return; } pathToward(b,ld.x+rnd(-5,5),ld.z+rnd(-5,5)); return; } }
   if(DOM.on&&DOM.flags.length&&Math.random()<0.8){
     if(navMode()&&now-(b.pathAt||0)<0.6)return;
     let fl=null,bd=1e9; for(const q of DOM.flags){ const open=q.own!==b.team||Math.abs(q.prog)<0.99; let cnt=0; if(DOM.flags.length>3)for(const o of fighters)if(o!==b&&o.gf===q&&o.team===b.team&&o.alive)cnt++; const d=Math.hypot(q.x-b.x,q.z-b.z)*(TM.cq?0.6:1)+(open?0:60)+Math.random()*25+cnt*22; if(d<bd){bd=d;fl=q;} }
@@ -1474,7 +1480,7 @@ function drawRadar(dt){
     rc.fillRect((b.minx+o)*k,(b.minz+o)*k,b.w*k,b.d*k); }
   if(DOM.on) for(const q of DOM.flags){ rc.strokeStyle=q.own?(q.own==='a'?'#4a8fc4':'#e0812f'):'#cfcfcf'; rc.lineWidth=2; rc.beginPath(); rc.arc((q.x+o)*k,(q.z+o)*k,5,0,6.3); rc.stroke(); }
   for(const f of fighters){ if(!f.alive||f.isPlayer)continue; const x=(f.x+o)*k,y=(f.z+o)*k;
-    if(f.side===P.side){ rc.fillStyle='#9be28f'; rc.beginPath(); rc.arc(x,y,3.2,0,6.3); rc.fill(); }
+    if(f.side===P.side){ rc.fillStyle=f.sq&&f.sq===P.sq?'#d9ff9a':'#9be28f'; rc.beginPath(); rc.arc(x,y,f.sq&&f.sq===P.sq?4:3,0,6.3); rc.fill(); }
     else if(f.spotted){ rc.fillStyle='#e5483a'; rc.beginPath(); rc.moveTo(x,y-4.5); rc.lineTo(x+4.5,y); rc.lineTo(x,y+4.5); rc.lineTo(x-4.5,y); rc.closePath(); rc.fill(); } }
   if(P.alive){ const x=(P.x+o)*k,y=(P.z+o)*k, a=Math.atan2(-Math.cos(P.yaw),-Math.sin(P.yaw));
     rc.save(); rc.translate(x,y); rc.rotate(a); rc.fillStyle='#ece8d8'; rc.beginPath(); rc.moveTo(6,0); rc.lineTo(-4,4); rc.lineTo(-2,0); rc.lineTo(-4,-4); rc.closePath(); rc.fill(); rc.restore(); }
@@ -1502,6 +1508,42 @@ function tintSky(fc){
   const pos=skyMesh.geometry.attributes.position, col=skyMesh.geometry.attributes.color, top=new THREE.Color(0x5f8fc2), hor=new THREE.Color(fc), c=new THREE.Color();
   for(let i=0;i<pos.count;i++){ const y=pos.getY(i)/150, t=Math.pow(Math.max(0,y),0.55); c.copy(hor).lerp(top,t); col.setXYZ(i,c.r,c.g,c.b); }
   col.needsUpdate=true;
+}
+/* ---------- Takımlar (squad) ---------- */
+const SQ={rally:{},mesh:{},cd:0,hudT:0};
+function assignSquads(){
+  for(const t of ['a','o']){
+    const L=fighters.filter(f=>f.team===t);
+    L.forEach((f,i)=>{ f._k=f.id!=null?f.id:(f.isPlayer?-1:1e6+i); }); L.sort((x,y)=>x._k-y._k);
+    L.forEach((f,i)=>{ f.sq=t+Math.floor(i/4); f.sqLead=(i%4===0); });
+  }
+  for(const k in SQ.rally)delete SQ.rally[k]; for(const k in SQ.mesh){ worldTDM.remove(SQ.mesh[k]); delete SQ.mesh[k]; }
+}
+function setRally(sq,x,z,mine){
+  SQ.rally[sq]={x,z,t:now,uses:6};
+  if(SQ.mesh[sq]){ worldTDM.remove(SQ.mesh[sq]); delete SQ.mesh[sq]; }
+  const col=sq[0]==='a'?TEAM.a.col:TEAM.o.col, g=new THREE.Group();
+  const pole=new THREE.Mesh(new THREE.BoxGeometry(0.08,2.2,0.08),new THREE.MeshBasicMaterial({color:col})); pole.position.y=1.1; g.add(pole);
+  const fl=new THREE.Mesh(new THREE.PlaneGeometry(0.8,0.5),new THREE.MeshBasicMaterial({color:col,side:THREE.DoubleSide})); fl.position.set(0.45,1.95,0); g.add(fl);
+  g.position.set(x,0,z); worldTDM.add(g); SQ.mesh[sq]=g;
+}
+function placeRally(){
+  if(!P||!P.alive||P.air||P.veh||state!=='play'||mode!=='tdm'||paused||!P.sq)return;
+  if(!P.sqLead){ toast('Toplanma noktasını yalnızca takım lideri koyar'); return; }
+  if(SQ.cd>0){ toast('Toplanma noktası '+Math.ceil(SQ.cd)+' sn sonra'); return; }
+  SQ.cd=25; setRally(P.sq,P.x,P.z,true); toast('Toplanma noktası kuruldu: takımın burada doğar'); if(MP.play)mpSend({t:'gad',k:'rally',x:+P.x.toFixed(1),z:+P.z.toFixed(1)});
+}
+function squadSpawn(f){
+  const r=f.sq&&SQ.rally[f.sq]; if(!r)return null;
+  if(now-r.t>90||r.uses<=0){ delete SQ.rally[f.sq]; if(SQ.mesh[f.sq]){ worldTDM.remove(SQ.mesh[f.sq]); delete SQ.mesh[f.sq]; } return null; }
+  if(!f.isPlayer&&Math.random()>0.6)return null; let x,z,t=0; do{ const a=Math.random()*6.283,d=1.5+Math.random()*2.5; x=r.x+Math.cos(a)*d; z=r.z+Math.sin(a)*d; t++; }while(blockedAt(x,z,0.6,0)&&t<20);
+  if(t>=20)return null; r.uses--; SQ._sp=[x,z]; return SQ._sp;
+}
+function squadHud(dt){
+  SQ.cd=Math.max(0,SQ.cd-dt); SQ.hudT-=dt; if(SQ.hudT>0)return; SQ.hudT=0.5;
+  const el=$('squad'); if(!P||mode!=='tdm'||!P.sq||state!=='play'){ el.innerHTML=''; return; }
+  const L=fighters.filter(f=>f.sq===P.sq).sort((a,b)=>(b.sqLead?1:0)-(a.sqLead?1:0));
+  el.innerHTML='<div><b>Takım '+(P.sq.slice(1)*1+1)+'</b>'+(SQ.rally[P.sq]?' · toplanma ✓':'')+(P.sqLead?' · lider (T)':'')+'</div>'+L.map(f=>'<div class="'+(f.alive?'':'d')+'"><span style="width:92px;overflow:hidden;white-space:nowrap">'+(f.sqLead?'★ ':'')+(f.isPlayer?'Sen':f.name)+'</span><span style="width:38px"><i style="width:'+Math.max(0,Math.round(38*f.hp/f.maxHp))+'px"></i></span></div>').join('');
 }
 /* ---------- Sınıflar, yıkım ve bayrak modu ---------- */
 const CLASSES=[
@@ -2478,6 +2520,7 @@ function startGame(teamKey){
   for(let i=0;i<4;i++) fighters.push(makeFighter(foes[i],en,false,false)); }
   buildViewmodels(teamKey); resetAmmo();
   if(DOM.on)domInit();
+  assignSquads();
   for(const f of fighters) respawn(f);
   $('feed').innerHTML=''; $('dead').style.display='none'; $('hint').style.display='none';
   updateScoreHud(); $('prompt').style.display='none'; $('vinfo').style.display='none'; $('goal').textContent='İlk 30 öldürmeye ulaşan kazanır   |   Harita: '+TM.name; state='play'; paused=false; fallback=false; document.body.classList.remove('nolock'); P.pitch=0;
@@ -2544,7 +2587,7 @@ window.addEventListener('keydown',e=>{
   if(e.code==='KeyP'&&fallback){ paused=!paused; $('pause').classList.toggle('on',paused); }
   if(paused)return;
   if(e.code==='KeyE')interact();
-  if(e.code==='KeyQ')useAbility(); if(e.code==='KeyG')throwNade('frag'); if(e.code==='KeyH')throwNade('smoke'); if(e.code==='KeyV'||e.code==='KeyF')stab();
+  if(e.code==='KeyQ')useAbility(); if(e.code==='KeyT')placeRally(); if(e.code==='KeyG')throwNade('frag'); if(e.code==='KeyH')throwNade('smoke'); if(e.code==='KeyV'||e.code==='KeyF')stab();
   if(e.code==='KeyX')P.pitch=0;
   if(e.code==='KeyR')startReload();
   { const dm=/^Digit(\d)$/.exec(e.code); if(dm){ const wn=+dm[1]-1; if(wn>=0&&wn<LOADOUT.length)selectWeapon(wn); } }
@@ -2640,7 +2683,7 @@ if(IS_TOUCH){
   tap('tswap',()=>selectWeapon((cur+1)%LOADOUT.length));
   tap('tfrag',()=>throwNade('frag'));
   tap('tsmoke',()=>throwNade('smoke'));
-  tap('tabil',()=>useAbility());
+  tap('tabil',()=>useAbility()); tap('trally',()=>placeRally());
   tap('tknife',()=>stab());
   tap('tuse',()=>interact());
   for(const [id,fn] of [['tsp1',()=>specStep(1)],['tsp2',()=>specStep(-1)],['tsp3',()=>{MP.specFp=!MP.specFp;}]]){ const el=$(id); el.addEventListener('pointerdown',e=>{ e.preventDefault(); e.stopPropagation(); if(specOn())fn(); }); }
@@ -2825,7 +2868,7 @@ function startMP(){
     score.a=MP.score.a; score.o=MP.score.o; timeLeft=MP.left; if(DOM.on)domInit();
     P=makeFighter(me.name,me.team,true,false); P.vx=P.vz=P.vy=0; P.id=MP.id; me.f=P; fighters.push(P);
     for(const id in MP.players){ const pl=MP.players[id]; if(pl.id!==MP.id)addRemote(pl); }
-    buildViewmodels(me.team); resetAmmo(); respawn(P);
+    buildViewmodels(me.team); resetAmmo(); assignSquads(); respawn(P);
     updateScoreHud(); $('goal').textContent=DOM.on?(CQ.on?'Büyük savaş':'Bayrak ele geçirme'):'İlk 30 öldürmeye ulaşan kazanır   |   Harita: '+TM.name;
   }
   $('feed').innerHTML=''; $('dead').style.display='none'; $('hint').style.display='none'; $('prompt').style.display='none'; $('vinfo').style.display='none';
@@ -2879,7 +2922,7 @@ function mpMsg(m){
     case 'st': { if(!MP.play)break; const pl=MP.players[m.id]; if(!pl||!pl.f)break; const f=pl.f; f.tx=m.x; f.ty=m.y; f.tz=m.z; f.tyaw=m.yaw; f.spd=m.s; f.air=!!(m.a||m.iv); f.iv=!!m.iv; if(f.fresh){ f.x=m.x; f.y=m.y; f.z=m.z; f.yaw=m.yaw; f.fresh=false; } setRemoteWeapon(f,m.w); break; }
     case 'bs': { if(!MP.play||MP.host===MP.id)break; for(const q of m.b){ const pl=MP.players[q[0]]; if(!pl||!pl.f||!pl.f.remote)continue; const f=pl.f; f.tx=q[1]; f.ty=q[2]; f.tz=q[3]; f.tyaw=q[4]; f.spd=q[5]; f.air=!!q[6]; if(f.fresh){ f.x=q[1]; f.y=q[2]; f.z=q[3]; f.yaw=q[4]; f.fresh=false; } setRemoteWeapon(f,q[7]); } break; }
     case 'sh': { const f=pf(m.id); if(!MP.play||!f||f===P)break; tracer(m.ax,m.ay,m.az,m.bx,m.by,m.bz); if(m.bm)boomFx(m.bx,m.by,m.bz); f.flash.visible=true; f.flashT=0.05; f.firedT=1.2; const w=WBYID[m.w]||WBYID.alfa7; sndShot(0.28/(1+Math.hypot(f.x-P.x,f.z-P.z)/7),w.pitch); break; }
-    case 'gad': { const f=pf(m.id); if(MP.play&&P&&P.alive&&f&&f!==P&&f.team===P.team&&m.k==='ammo'&&Math.hypot(m.x-P.x,m.z-P.z)<8){ refillAmmo(); toast('İkmal alındı'); } break; }
+    case 'gad': { const f=pf(m.id); if(MP.play&&P&&f&&f!==P&&f.team===P.team&&m.k==='rally'&&f.sq){ setRally(f.sq,m.x,m.z,false); break; } if(MP.play&&P&&P.alive&&f&&f!==P&&f.team===P.team&&m.k==='ammo'&&Math.hypot(m.x-P.x,m.z-P.z)<8){ refillAmmo(); toast('İkmal alındı'); } break; }
     case 'nade': { const f=pf(m.id); if(MP.play&&f&&f!==P)spawnProj(m.k,f,m.x,m.y,m.z,m.vx,m.vy,m.vz); break; }
     case 'hp': if(MP.play&&P){ if(m.hp<P.hp-0.5){ hurtT=0.7; } P.hp=m.hp; if(m.ar!=null)P.armor=m.ar; } break;
     case 'time': timeLeft=m.left; break;
@@ -2993,7 +3036,7 @@ function frame(t){
   const dt=Math.min(0.05,(t-last)/1000); last=t; now+=dt;
   if(state==='play'&&(!paused||MP.play)&&P){
     timeLeft-=dt; if(timeLeft<=0){ timeLeft=0; if(!MP.play)endMatch(); }
-    if(abilCd>0)abilCd-=dt; if(DOM.on&&mode==='tdm'&&state==='play')domUpdate(dt);
+    squadHud(dt); if(abilCd>0)abilCd-=dt; if(DOM.on&&mode==='tdm'&&state==='play')domUpdate(dt);
     updatePlayer(dt);
     for(const f of fighters) if(!f.isPlayer){ if(f.remote)updateRemote(f,dt); else updateBot(f,dt); }
     if(MP.play){
@@ -3014,7 +3057,7 @@ function frame(t){
   renderer.render(scene,camera);
 }
 buildViewmodels('a'); refreshMenuLevel();
-window.__TA={get LOADOUT(){return LOADOUT;},CQ,navPath,TM:()=>TM,DOM,useAbility,get abilCd(){return abilCd;},score,destroyCover,BOX_TDM,setTDMMap,NODES,nearestNode,findPath,ground:(x,z,r,y)=>groundAt(x,z,r,y),blocked:(x,z,r,y)=>blockedAt(x,z,r,y),BOXES,get MP(){return MP;},mpMsg,get mode(){return mode;},addXP,get prof(){return prof;},WEAP,DBG,fighters,get P(){return P;},scene,camera,BR};
+window.__TA={SQ,respawn,get LOADOUT(){return LOADOUT;},CQ,navPath,TM:()=>TM,DOM,useAbility,get abilCd(){return abilCd;},score,destroyCover,BOX_TDM,setTDMMap,NODES,nearestNode,findPath,ground:(x,z,r,y)=>groundAt(x,z,r,y),blocked:(x,z,r,y)=>blockedAt(x,z,r,y),BOXES,get MP(){return MP;},mpMsg,get mode(){return mode;},addXP,get prof(){return prof;},WEAP,DBG,fighters,get P(){return P;},scene,camera,BR};
 requestAnimationFrame(frame);
 })();
 </script>
