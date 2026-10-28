@@ -406,7 +406,7 @@ body.touch.useok #tuse{display:flex}
   <p class="gp">Maça üç silahla girersin. Önce bir kutu seç, sonra aşağıdan silahı seç. Yeni silahlar seviye atladıkça açılır.</p>
   <div class="slots" id="slots"></div>
   <div class="wgrid" id="wgrid"></div>
-  <div class="gfoot"><button class="btn" id="gback">Menüye dön</button><button class="lnk" id="gtest">Seviye atla (test)</button><button class="lnk" id="greset">İlerlemeyi sıfırla</button></div>
+  <div class="gfoot"><button class="btn" id="gback">Menüye dön</button><button class="lnk" id="greset">İlerlemeyi sıfırla</button></div>
 </div>
 
 <div id="touch">
@@ -2681,7 +2681,6 @@ $('wgrid').addEventListener('click',e=>{
 });
 $('gearbtn').addEventListener('click',()=>{ $('menu').classList.remove('on'); $('gear').classList.add('on'); renderGear(); });
 $('gback').addEventListener('click',()=>{ prof.seen=prof.level; saveProf(); refreshMenuLevel(); $('gear').classList.remove('on'); $('menu').classList.add('on'); });
-$('gtest').addEventListener('click',()=>{ if(prof.level<MAX_LEVEL){ prof.level++; prof.xp=0; saveProf(); renderGear(); refreshMenuLevel(); } });
 $('greset').addEventListener('click',()=>{ prof={xp:0,level:1,seen:1,loadout:DEFAULT_LO.slice()}; fixLoadout(); applyLoadout(); saveProf(); gearSlot=0; renderGear(); refreshMenuLevel(); });
 
 /* ---------- Oyun akışı ---------- */
@@ -3253,7 +3252,7 @@ function frame(t){
   renderer.render(scene,camera);
 }
 buildViewmodels('a'); refreshMenuLevel();
-window.__TA={BRX:BR,interact,CQV,CTF,RU,ruInit,SQ,respawn,get LOADOUT(){return LOADOUT;},CQ,navPath,TM:()=>TM,DOM,useAbility,get abilCd(){return abilCd;},score,destroyCover,BOX_TDM,setTDMMap,NODES,nearestNode,findPath,ground:(x,z,r,y)=>groundAt(x,z,r,y),blocked:(x,z,r,y)=>blockedAt(x,z,r,y),BOXES,get MP(){return MP;},mpMsg,get mode(){return mode;},addXP,get prof(){return prof;},WEAP,DBG,fighters,get P(){return P;},scene,camera,BR};
+if(/[?&]debug\b/.test(location.search))window.__TA={BRX:BR,interact,CQV,CTF,RU,ruInit,SQ,respawn,get LOADOUT(){return LOADOUT;},CQ,navPath,TM:()=>TM,DOM,useAbility,get abilCd(){return abilCd;},score,destroyCover,BOX_TDM,setTDMMap,NODES,nearestNode,findPath,ground:(x,z,r,y)=>groundAt(x,z,r,y),blocked:(x,z,r,y)=>blockedAt(x,z,r,y),BOXES,get MP(){return MP;},mpMsg,get mode(){return mode;},addXP,get prof(){return prof;},WEAP,DBG,fighters,get P(){return P;},scene,camera,BR};
 requestAnimationFrame(frame);
 })();
 </script>
