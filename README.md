@@ -148,3 +148,4 @@ yalnızca DoS'u kesiyor, hileyi kesmiyor.
 - Botlar boş helikoptere pilot olarak biner; yerdeyken 6 sn içinde yanındaki en çok 2 bot mürettebat olarak biner, hepsi birlikte kalkar, yerden düşmana ateş eder. Heli 50 sn sonra alçalıp iner, hepsi iner. Pilot ölürse mürettebat da düşer.
 - Battle Royale'de de botlar helikopter/araç kullanır (çember merkezine doğru); Rush/Büyük savaşta yalnız saldırgan botlar biner.
 - Rush başlangıcında her iki takımın helikopteri için en yakın 3 bot (pilot + 2 mürettebat) otomatik atanır; hepsi bindikten sonra birlikte kalkarlar.
+- Rush'ta insan oyuncunun takımının helikopterine yalnız 2 bot (mürettebat) biner ve pilot koltuğunu oyuncuya bekler: E ile bin, kalkınca botlar yerden düşmana ateş eder. 25 sn kimse binmezse botlar iner; oyuncu atlarsa/heli düşerse botlar da iner. Rakip takımın helikopteri 3 botla uçar.
