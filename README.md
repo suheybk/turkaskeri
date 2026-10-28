@@ -120,3 +120,8 @@ yalnızca DoS'u kesiyor, hileyi kesmiyor.
 - C4 ve patlamalar binaları (bld 2, hangar 3 vuruş) kademeli yıkar.
 - Menüde aksesuar (kabza/şarjör/susturucu) aç-kapa; tercih localStorage'da.
 - Sağlıkçı Q: 20 sn can kutusu, Destek Q: 25 sn cephane kutusu (takım yakınında kullanır; çok oyunculuda yayılır).
+
+## Bayrak kapma (CTF)
+- Tek oyunculu menüde "Bayrak kapma (CTF)", çok oyunculuda lobide "Bayrak kapma" (dom=3). İlk 5 yakalamaya ulaşan kazanır.
+- Düşmanın bayrağına dokun → taşı → kendi bayrağın üstteyken kendi üssüne getir. Taşıyan ölürse bayrak düşer; takım arkadaşı dokunursa üsse döner, 25 sn dokunulmazsa kendiliğinden döner.
+- Çok oyunculu: bayrak durumunu host hesaplar (`cfl` yayını), skor `dscore` ile sunucuya gider.

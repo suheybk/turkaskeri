@@ -149,7 +149,7 @@ export class Accounts {
 /* ------------------------------------------------------------------ */
 /* Oda: takım savaşı (TDM) ya da Battle Royale, insan + bot                */
 /* ------------------------------------------------------------------ */
-const CQ_T = 500, DOM_T = 100, TARGET = 30, TARGET_DM = 40, MATCH = 360, MATCH_DM = 600, MAXH = 8, PERTEAM = 4, BRMAX = 16;
+const CQ_T = 500, DOM_T = 100, CTF_T = 5, TARGET = 30, TARGET_DM = 40, MATCH = 360, MATCH_DM = 600, MAXH = 8, PERTEAM = 4, BRMAX = 16;
 const BOTNAMES = ['Kaan', 'Yağız', 'Tolga', 'Efe', 'Bora', 'Tuna', 'Arda', 'Demir', 'Ozan', 'Berk', 'Mert', 'Ilgaz', 'Barış', 'Cem', 'Alper', 'Umut', 'Kerem', 'Onur', 'Selim', 'Emre', 'Deniz', 'Rüzgar'];
 const num = (v, d = 0) => (Number.isFinite(+v) ? +v : d);
 const sid = (v) => String(v == null ? '' : v).slice(0, 24);
@@ -253,7 +253,7 @@ export class Room {
   clearNv() { if (this.nv) { clearTimeout(this.nv.timer); this.nv = null; } }
   beginNv() {
     if (this.phase !== 'end' || !this.players.size) return;
-    const pool = [['tdm', 0], ['tdm', 1], ['tdm', 2], ['br', 0], ['dm', 0]].sort(() => Math.random() - 0.5), opts = [];
+    const pool = [['tdm', 0], ['tdm', 1], ['tdm', 2], ['tdm', 3], ['br', 0], ['dm', 0]].sort(() => Math.random() - 0.5), opts = [];
     for (const [mode, dom] of pool) { if (opts.length >= 3) break; opts.push({ mode, dom, seed: (Math.random() * 2147483647) | 0 }); }
     this.clearNv(); this.nv = { opts, votes: new Map(), timer: setTimeout(() => this.endNv(), 13000) };
     this.bcast({ t: 'nvote', ms: 13000, opts });
@@ -348,7 +348,7 @@ export class Room {
       /* kurucu ayarları */
       case 'mode': if (isHost && lobbyOK && (m.mode === 'tdm' || m.mode === 'br' || m.mode === 'dm')) { this.clearNv(); this.mode = m.mode; if (this.mode !== 'tdm') this.dom = 0; this.normalize(); this.sendLobby(); } break;
       case 'nv': if (this.nv && this.phase === 'end') { const i = num(m.i) | 0; if (i >= 0 && i < this.nv.opts.length) { this.nv.votes.set(p.id, i); const c = this.nv.opts.map(() => 0); for (const v of this.nv.votes.values()) c[v]++; this.bcast({ t: 'nvc', c }); } } break;
-      case 'dom': if (isHost && lobbyOK && this.mode === 'tdm') { this.clearNv(); this.dom = Math.max(0, Math.min(2, num(m.on) | 0)); this.normalize(); this.sendLobby(); } break;
+      case 'dom': if (isHost && lobbyOK && this.mode === 'tdm') { this.clearNv(); this.dom = Math.max(0, Math.min(3, num(m.on) | 0)); this.normalize(); this.sendLobby(); } break;
       case 'addbot': if (isHost && lobbyOK) { this.addBot(m.team === 'o' ? 'o' : 'a'); this.sendLobby(); } break;
       case 'fillbots': if (isHost && lobbyOK) { this.fillBots(); this.sendLobby(); } break;
       case 'clearbots': if (isHost && lobbyOK) { this.bots.clear(); this.sendLobby(); } break;
@@ -376,10 +376,12 @@ export class Room {
         const da = Math.min(8, Math.max(0, num(m.a) | 0)), dob = Math.min(8, Math.max(0, num(m.o) | 0));
         if (this.dom === 2) { this.score.a = Math.max(0, this.score.a - da); this.score.o = Math.max(0, this.score.o - dob); }
         else { this.score.a += da; this.score.o += dob; }
+        const tgt = this.dom === 3 ? CTF_T : DOM_T;
         this.bcast({ t: 'dsc', score: this.score });
-        if (this.dom === 2 ? (this.score.a <= 0 || this.score.o <= 0) : (this.score.a >= DOM_T || this.score.o >= DOM_T)) this.endMatch();
+        if (this.dom === 2 ? (this.score.a <= 0 || this.score.o <= 0) : (this.score.a >= tgt || this.score.o >= tgt)) this.endMatch();
         break;
       }
+      case 'cfl': if (isHost && this.phase === 'play' && this.dom === 3 && Array.isArray(m.f)) this.bcast({ t: 'cfl', f: m.f.slice(0, 2).map((q) => [num(q[0]), num(q[1]), num(q[2], -1) | 0]) }, p); break;
       case 'dfl': if (isHost && this.phase === 'play' && this.dom && Array.isArray(m.fl)) this.bcast({ t: 'dfl', fl: m.fl.slice(0, 8).map((q) => [num(q[0]), q[1] === 'a' ? 'a' : q[1] === 'o' ? 'o' : '']) }, p); break;
       case 'bs': if (isHost && this.phase === 'play' && Array.isArray(m.b)) this.bcast({ t: 'bs', b: m.b.slice(0, 70) }, p); break;
       case 'sh': {
