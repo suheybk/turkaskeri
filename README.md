@@ -115,3 +115,8 @@ yalnızca DoS'u kesiyor, hileyi kesmiyor.
 
 ### Maç sonu oylaması ve harita rotasyonu
 - Maç bitince sunucu 3 rastgele seçenek (mod + harita) sunar, 13 sn oylanır, kazanan 3 sn sonra otomatik başlar. Kurucu manuel başlatırsa oylama iptal olur.
+
+## Yıkılabilir binalar, aksesuar seçimi, sağlık/ikmal kutuları
+- C4 ve patlamalar binaları (bld 2, hangar 3 vuruş) kademeli yıkar.
+- Menüde aksesuar (kabza/şarjör/susturucu) aç-kapa; tercih localStorage'da.
+- Sağlıkçı Q: 20 sn can kutusu, Destek Q: 25 sn cephane kutusu (takım yakınında kullanır; çok oyunculuda yayılır).

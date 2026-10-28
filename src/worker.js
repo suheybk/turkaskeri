@@ -412,13 +412,15 @@ export class Room {
       case 'heal': {
         if (this.phase !== 'play' || this.mode !== 'tdm' || !p.alive) return;
         const v = this.ent(num(m.to, -1)); if (!v || !v.alive || v.spec || v.team !== p.team) return;
-        const now = Date.now(); if (now - (p.healT || 0) > 400) { if (now - (p.healT0 || 0) < 8000) return; p.healT0 = now; } p.healT = now;
+        const now = Date.now();
+        if (m.c) { if (v !== p || now - (p.crT || 0) < 1300) return; p.crT = now; v.hp = Math.min(v.team === 'o' ? 90 : 100, v.hp + Math.min(20, Math.max(0, num(m.d)))); this.send(v, { t: 'hp', hp: v.hp, ar: v.armor }); break; }
+        if (now - (p.healT || 0) > 400) { if (now - (p.healT0 || 0) < 8000) return; p.healT0 = now; } p.healT = now;
         const d = Math.min(60, Math.max(0, num(m.d)));
         if (m.k === 'ar') v.armor = Math.min(100, (v.armor || 0) + d); else v.hp = Math.min(v.team === 'o' ? 90 : 100, v.hp + d);
         if (!v.bot) this.send(v, { t: 'hp', hp: v.hp, ar: v.armor });
         break;
       }
-      case 'gad': if (this.phase === 'play' && p.alive && this.mode === 'tdm') this.bcast({ t: 'gad', id: p.id, k: m.k === 'rally' ? 'rally' : 'ammo', x: num(m.x), z: num(m.z) }, p); break;
+      case 'gad': if (this.phase === 'play' && p.alive && this.mode === 'tdm') this.bcast({ t: 'gad', id: p.id, k: m.k === 'rally' ? 'rally' : m.k === 'crate' ? 'crate' : 'ammo', c: m.c === 'h' ? 'h' : 'a', x: num(m.x), z: num(m.z) }, p); break;
       /* Battle Royale: eşya ve araç */
       case 'pick': {
         if (this.mode !== 'br' || this.phase !== 'play' || !p.alive) return; const id = sid(m.id);
