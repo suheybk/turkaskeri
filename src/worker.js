@@ -287,7 +287,7 @@ export class Room {
     else { this.bcast({ t: 'voteend', ok: true, rej, acc }); this.startMatch(); }
   }
   startMatch() {
-    this.phase = 'play'; const cq = this.mode === 'tdm' && this.dom === 2; const ru = this.mode === 'tdm' && this.dom === 4; this.score = cq ? { a: CQ_T, o: CQ_T } : ru ? { a: 0, o: 1 } : { a: 0, o: 0 }; this.left = this.mode === 'dm' ? MATCH_DM : cq || ru ? 600 : MATCH; this.seed = this.nextSeed != null ? this.nextSeed : (Math.random() * 2147483647) | 0; this.nextSeed = null;
+    this.phase = 'play'; const cq = this.mode === 'tdm' && this.dom === 2; const ru = this.mode === 'tdm' && this.dom === 4; this.score = cq ? { a: CQ_T, o: CQ_T } : ru ? { a: 0, o: 1 } : { a: 0, o: 0 }; this.left = this.mode === 'dm' ? MATCH_DM : ru ? 900 : cq ? 600 : MATCH; this.seed = this.nextSeed != null ? this.nextSeed : (Math.random() * 2147483647) | 0; this.nextSeed = null;
     this.picked.clear(); this.veh.clear(); this.veh2.clear();
     for (const e of this.all()) { e.kills = 0; e.deaths = 0; e.alive = true; e.spec = false; e.hp = this.hpFor(e); e.lastHit = 0; e.place = 0; e.armor = 0; }
     this.alive = this.all().length;
@@ -386,7 +386,7 @@ export class Room {
       case 'rst': if (isHost && this.phase === 'play' && this.dom === 4 && Array.isArray(m.ob)) this.bcast({ t: 'rst', tk: num(m.tk), st: num(m.st) | 0, ob: m.ob.slice(0, 4).map((q) => [num(q[0]) | 0, num(q[1]), num(q[2]), num(q[3])]) }, p); break;
       case 'fin': if (isHost && this.phase === 'play' && this.dom === 4) { this.score = m.w === 'a' ? { a: 2, o: 1 } : { a: 0, o: 1 }; this.bcast({ t: 'dsc', score: this.score }); this.endMatch(); } break;
       case 'dfl': if (isHost && this.phase === 'play' && this.dom && Array.isArray(m.fl)) this.bcast({ t: 'dfl', fl: m.fl.slice(0, 8).map((q) => [num(q[0]), q[1] === 'a' ? 'a' : q[1] === 'o' ? 'o' : '']) }, p); break;
-      case 'bs': if (isHost && this.phase === 'play' && Array.isArray(m.b)) this.bcast({ t: 'bs', b: m.b.slice(0, 70) }, p); break;
+      case 'bs': if (isHost && this.phase === 'play' && Array.isArray(m.b)) this.bcast({ t: 'bs', b: m.b.slice(0, 70), v: Array.isArray(m.v) ? m.v.slice(0, 24) : [] }, p); break;
       case 'sh': {
         if (this.phase !== 'play') return;
         let id = p.id; if (m.bot != null) { if (!isHost || !this.bots.has(num(m.bot))) return; id = num(m.bot); } else if (!p.alive) return;

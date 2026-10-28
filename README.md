@@ -135,3 +135,8 @@ yalnızca DoS'u kesiyor, hileyi kesmiyor.
 - Büyük savaş (32v32) ve Rush haritalarında her takımın üssünde tank, 2 makineli jip, cip ve motosiklet; ortada 2 cip bulunur. E ile bin/in; jip ve tankta ikinci koltuk (yolcu/nişancı) vardır.
 - Araç sistemi Battle Royale ile aynıdır (aynı sürüş, silah ve çok oyunculu `venter/vleave/vst` mesajları); araçlar maç başında yeniden kurulur.
 - Sınırlar: araçların canı yoktur (patlatılamaz), botlar araç kullanmaz, helikopter/uçak bu modlarda yok.
+
+## Botlar araç kullanır, helikopter, geniş Rush haritaları
+- Büyük savaş ve Rush'ta botlar yakındaki boş araca biner (Rush'ta yalnız saldırganlar), hedefe sürer, tank/jip/helikopterden ateş eder, ezer; 45 sn sonra iner, ölünce araçtan düşer. Çok oyunculuda host sürer, araç durumu `bs` mesajıyla yayılır.
+- Her üste helikopter var (W/S ileri-geri, Boşluk/Shift yükseklik); harita sınırı içinde kalır.
+- Rush için iki yeni 340×340 harita: "Geniş Vadi" ve "Büyük Liman"; Rush süresi 15 dk, bu haritalarda ekstra tank/jip var.

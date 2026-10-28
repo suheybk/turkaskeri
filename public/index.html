@@ -459,7 +459,7 @@ function genCQ(map){
     return true; };
   const kinds=port?[['cont',6,2.4,2.8,0.55],['hangar',20,9,7,0.12],['bld',10,8,6,0.1],['crate',1.6,1.6,1.2,0.12],['low',5,1,1.2,0.11]]
                   :[['bld',11,9,6.5,0.5],['bld',8,7,5,0.2],['hangar',18,8,7,0.06],['cont',6,2.4,2.8,0.1],['crate',1.6,1.6,1.2,0.08],['low',5,1,1.2,0.06]];
-  for(let n=0;n<900&&out.length<(port?95:75);n++){
+  for(let n=0;n<1800&&out.length<(map.n||(port?95:75));n++){
     let r=R(),k=kinds[0]; for(const q of kinds){ if(r<q[4]){k=q;break;} r-=q[4]; }
     let w=k[1],d=k[2]; if(R()<0.5){ const t=w; w=d; d=t; }
     if(k[0]==='bld'||k[0]==='hangar'){ w*=0.85+R()*0.4; d*=0.85+R()*0.4; }
@@ -540,7 +540,9 @@ const MAPS=[
     [4,-8,1.6,1.6,1.2,'crate'],[14,-6,1.6,1.6,1.2,'crate'],[-18,-2,1.6,1.6,1.2,'crate'],[-4,-26,6,2.4,2.8,'cont'],[10,-27,6,2.4,2.8,'cont'],
     [-18,-27,3,3,3.2,'tank'],[0,-14,10,3,4.5,'hangar'],[24,-6,4,4,3,'tank']]},
   {name:'Kuşatma',fog:0xa8b0a8,tint:0xc8c4a8,half:110,cq:true,flags:[[0,0],[-62,-38],[62,38],[-55,50],[55,-50],[0,-68],[0,68]],gen:[777,'city']},
-  {name:'Liman',fog:0x8fa0ae,tint:0xaab4bc,half:110,cq:true,flags:[[0,0],[-62,-38],[62,38],[-55,50],[55,-50],[0,-68],[0,68]],gen:[4242,'port']}
+  {name:'Liman',fog:0x8fa0ae,tint:0xaab4bc,half:110,cq:true,flags:[[0,0],[-62,-38],[62,38],[-55,50],[55,-50],[0,-68],[0,68]],gen:[4242,'port']},
+  {name:'Geniş Vadi (Rush)',fog:0xb4b09a,tint:0xd2c8a4,half:170,cq:true,rush:true,n:150,flags:[[0,0],[-95,-55],[95,55],[-85,78],[85,-78],[0,-108],[0,108]],gen:[9001,'city']},
+  {name:'Büyük Liman (Rush)',fog:0x8fa0ae,tint:0xaab4bc,half:170,cq:true,rush:true,n:170,flags:[[0,0],[-95,-55],[95,55],[-85,78],[85,-78],[0,-108],[0,108]],gen:[31337,'port']}
 ];
 const NODES=[];
 function buildNodes(map){
@@ -640,8 +642,10 @@ function navPath(x0,z0,x1,z1){
 const BOX_TDM=BOXES.slice();
 let TM=MAPS[0], MH=40;
 const CQ={on:false}, CQ_TICKETS=500;
-function pickMapIdx(cq,pref,seed){
-  const L=[]; MAPS.forEach((m,i)=>{ if(!!m.cq===cq)L.push(i); });
+function pickMapIdx(cq,pref,seed,ru){
+  if(ru===undefined)ru=typeof RU!=='undefined'&&RU.on;
+  const L=[]; MAPS.forEach((m,i)=>{ if(!!m.cq===cq&&(ru||!m.rush))L.push(i); });
+  if(ru){ const R=L.filter(i=>MAPS[i].rush); if(R.length&&(pref<0||!L.includes(pref)))return R[seed!=null?(seed>>>0)%R.length:Math.floor(Math.random()*R.length)]; }
   if(pref>=0&&L.includes(pref))return pref;
   return L[seed!=null?(seed>>>0)%L.length:Math.floor(Math.random()*L.length)];
 }
@@ -1085,7 +1089,7 @@ function dmSpawnPoint(f){
 function respawn(f){
   const t=TEAM[f.team]; let x,z,tries=0; const dm=BR.dm&&mode==='br';
   if(dm){ [x,z]=dmSpawnPoint(f); } else if(mode==='tdm'&&squadSpawn(f)){ [x,z]=SQ._sp; } else if(RU.on&&mode==='tdm'){ [x,z]=ruSpawn(f); } else if(CQ.on&&mode==='tdm'){ [x,z]=cqSpawn(f); } else do{ x=rnd(-10,10); z=t.spawnZ+rnd(-2,2); tries++; }while(blockedAt(x,z,0.6,0)&&tries<30);
-  f.x=x;f.z=z;f.y=0;f.yaw=dm?rnd(0,6.28):t.yaw+(f.isPlayer?0:rnd(-0.3,0.3));f.hp=f.maxHp;f.alive=true;f.deadK=0;f.target=null;f.seeing=false;f.path=null;f.cd=0.5;
+  f.veh=null;f.wantV=null;f.x=x;f.z=z;f.y=0;f.yaw=dm?rnd(0,6.28):t.yaw+(f.isPlayer?0:rnd(-0.3,0.3));f.hp=f.maxHp;f.alive=true;f.deadK=0;f.target=null;f.seeing=false;f.path=null;f.cd=0.5;
   if(f.isPlayer){ f.pitch=0;f.vx=0;f.vz=0;f.vy=0;recoil=0; f.gren=2; f.smk=2; f.armor=0; resetAmmo(); cur=0; selectWeapon(0,true); applyClass(); }
   else{ f.mesh.visible=true; f.mesh.rotation.x=0; }
 }
@@ -1160,6 +1164,7 @@ function damage(target,amt,att,head){
   if(target.hp<=0) kill(target,att,head);
 }
 function kill(t,a,head){
+  if(t.veh)botExit(t,true);
   t.alive=false; t.deaths++; t.respT=3; t.target=null; a.kills++; if(mode==='tdm'&&!DOM.on)score[a.team]++; else if(mode==='tdm'&&CQ.on&&!MP.play)score[t.team]=Math.max(0,score[t.team]-1);
   const ac_=a.css||TEAM[a.team].css, tc=t.css||TEAM[t.team].css;
   feed('<span style="color:'+ac_+'">'+a.name+'</span> '+(head?'(kafadan) ':'')+'→ <span style="color:'+tc+'">'+t.name+'</span>');
@@ -1241,6 +1246,8 @@ let flashT=0,vmKick=0,adsK=0,bobT=0,underW=false;
 /* ---------- Botlar ---------- */
 function pickGoal(b){
   if(mode==='br'){ pickGoalBR(b); return; }
+  if(CQV.on&&!b.veh&&!b.wantV&&(!RU.on||b.team==='a')&&Math.random()<0.25){ const v=botVehFind(b); if(v){ b.wantV=v; b.wantT=30; pathToward(b,v.x,v.z); return; } }
+  if(b.wantV){ pathToward(b,b.wantV.x,b.wantV.z); return; }
   if(b.sq&&!b.sqLead&&Math.random()<0.3){ const ld=fighters.find(f=>f.sq===b.sq&&f.sqLead&&f.alive&&f!==b); if(ld){ if(navMode()){ if(now-(b.pathAt||0)<0.6)return; } pathToward(b,ld.x+rnd(-5,5),ld.z+rnd(-5,5)); return; } }
   if(RU.on&&RU.obj.length){
     if(navMode()&&now-(b.pathAt||0)<0.6)return;
@@ -1338,6 +1345,8 @@ function updateBot(b,dt){
     return;
   }
   if(b.air){ updateAirBot(b,dt); return; }
+  if(b.veh){ botVehUpdate(b,dt); return; }
+  if(b.wantV){ const v=b.wantV; b.wantT=(b.wantT||0)-dt; if(v.occupied||v.pass||v.bot||b.wantT<=0)b.wantV=null; else if(Math.hypot(v.x-b.x,v.z-b.z)<3.4){ botEnter(b,v); return; } }
   b.firedT=Math.max(0,b.firedT-dt); b.cd-=dt; b.reactT-=dt; b.strafeT-=dt; b.scanT-=dt;
   if(b.flashT>0){ b.flashT-=dt; if(b.flashT<=0)b.flash.visible=false; }
   if(b.scanT<=0){ b.scanT=0.18+Math.random()*0.1; botScan(b); }
@@ -1809,6 +1818,71 @@ function ruUpdate(dt){
     $('goal').innerHTML=t; }
 }
 
+
+/* ---------- Botlar araç kullanır ---------- */
+function botVehFind(b){
+  let best=null,bd=34; for(const v of BR.vehicles){ if(v.occupied||v.pass||v.bot||v.type==='plane'||(v.type==='heli'&&v.y>1))continue; const d=Math.hypot(v.x-b.x,v.z-b.z); if(d<bd){bd=d;best=v;} } return best;
+}
+function botEnter(b,v){
+  v.occupied=true; v.bot=b; b.veh=v; b.vt=0; b.wantV=null; b.vgoal=null; b.vgoalT=0; b.vrev=0; b.vcd=1; b.vx0=v.x; b.vz0=v.z; b.vsT=0;
+  v.speed=0; v.vy=0; v.thr=0; syncVehBox(v); showDriver(v,true); b.mesh.visible=false; b.path=null; b.target=null; b.seeing=false;
+}
+function botExit(b,force){
+  const v=b.veh; if(!v)return; b.veh=null; v.bot=null; v.occupied=false; v.speed=0; showDriver(v,false); syncVehBox(v);
+  let px=v.x,pz=v.z; if(!force){ for(let d=2.4;d<12;d+=1){ const a=d*1.7, tx=v.x+Math.cos(a)*d, tz=v.z+Math.sin(a)*d; if(!blockedAt(tx,tz,0.5,0)){ px=tx; pz=tz; break; } } }
+  b.x=px; b.z=pz; b.y=force&&v.y>0.5?v.y:0; b.mesh.visible=true; b.path=null; b.pathAt=0; b.cd=0.6;
+}
+function botVehGoal(b){
+  const tm=b.team; let g=null;
+  if(RU.on&&RU.obj.length){ const cur=ruCur().filter(o=>o.state!==2); if(cur.length){ let o; if(tm==='a')o=cur[0]; else { const ar=cur.filter(q=>q.state===1); o=ar.length?ar[0]:cur[0]; } g=[o.x+rnd(-5,5),o.z+rnd(-5,5)]; } }
+  else if(DOM.flags.length){ const op=DOM.flags.filter(q=>q.own!==tm||Math.abs(q.prog)<0.99); const L=op.length?op:DOM.flags; let bd=1e9,bq=null; for(const q of L){ const d=Math.hypot(q.x-b.x,q.z-b.z)+Math.random()*40; if(d<bd){bd=d;bq=q;} } g=[bq.x+rnd(-6,6),bq.z+rnd(-6,6)]; }
+  return g||[rnd(-MH+20,MH-20),rnd(-MH+20,MH-20)];
+}
+function botVehUpdate(b,dt){
+  const v=b.veh, ty=v.type; b.vt+=dt; b.vgoalT-=dt; b.vcd-=dt;
+  if(!b.vgoal||b.vgoalT<=0||Math.hypot(v.x-b.vgoal[0],v.z-b.vgoal[1])<7){ b.vgoal=botVehGoal(b); b.vgoalT=10; }
+  const gx=b.vgoal[0], gz=b.vgoal[1], want=Math.atan2(-(gx-v.x),-(gz-v.z)), dy=wrapA(want-v.yaw);
+  const heli=ty==='heli';
+  if(heli){
+    const landing=b.vt>50, ty_=landing?0:14;
+    v.rotor=Math.min(1,v.rotor+dt*0.5);
+    v.y+=clamp(ty_-v.y,-5,4)*Math.min(1,dt*1.5); if(v.y<0)v.y=0;
+    v.yaw+=clamp(dy,-0.9,0.9)*dt*1.3;
+    const sp=(v.y>9&&!landing)?(Math.abs(dy)<0.7?22:6):0; v.speed+=(sp-v.speed)*Math.min(1,dt*0.8);
+    v.x=clamp(v.x-Math.sin(v.yaw)*v.speed*dt,-MH+3,MH-3); v.z=clamp(v.z-Math.cos(v.yaw)*v.speed*dt,-MH+3,MH-3);
+    v.pitchV=-(v.speed/30)*0.22; v.roll=0;
+    if(landing&&v.y<0.6){ botExit(b,false); return; }
+  }else{
+    const c=VCFG[ty];
+    if(b.vrev>0){ b.vrev-=dt; v.speed+=(-c.rev*0.8-v.speed)*Math.min(1,dt*3); v.yaw+=(b.vturn||1)*c.turn*0.5*dt*-1; }
+    else{
+      const fit=Math.abs(dy)<0.6?1:0.35, tgt=c.max*0.62*fit; v.speed+=(tgt-v.speed)*Math.min(1,dt*1.2);
+      v.yaw+=clamp(dy,-1,1)*c.turn*0.8*dt*(ty==='tank'?1:Math.max(0.3,Math.min(1,Math.abs(v.speed)/4)));
+    }
+    const nx=v.x-Math.sin(v.yaw)*v.speed*dt, nz=v.z-Math.cos(v.yaw)*v.speed*dt;
+    if(!hitsBoxes(nx,nz,0.1,c.h,c.r)){ v.x=nx; v.z=nz; }
+    else if(!hitsBoxes(nx,v.z,0.1,c.h,c.r)){ v.x=nx; v.speed*=0.8; }
+    else if(!hitsBoxes(v.x,nz,0.1,c.h,c.r)){ v.z=nz; v.speed*=0.8; }
+    else{ v.speed*=-0.2; if(b.vrev<=0){ b.vrev=1.4; b.vturn=Math.random()<0.5?-1:1; } }
+    b.vsT+=dt; if(b.vsT>2.5){ b.vsT=0; if(Math.hypot(v.x-b.vx0,v.z-b.vz0)<2.5&&b.vrev<=0){ b.vrev=1.6; b.vturn=Math.random()<0.5?-1:1; b.vgoal=null; } b.vx0=v.x; b.vz0=v.z; }
+    v.y=0; v.roll=0; v.pitchV=0;
+    if(v.parts.wheels)for(const w of v.parts.wheels) w.m.rotation.x-=v.speed*dt/w.r;
+    if(Math.abs(v.speed)>5){ for(const f of fighters){ if(f===b||!f.alive||f.air||f.team===b.team||Math.hypot(f.x-v.x,f.z-v.z)>(ty==='tank'?2.8:1.9))continue; damage(f,(ty==='tank'?160:70)+Math.abs(v.speed)*4,b,false); v.speed*=ty==='tank'?0.92:0.8; } }
+    if(b.vt>45&&Math.abs(v.speed)<8){ botExit(b,false); return; }
+  }
+  v.ty=wrapA(v.yaw-v.yaw); animVeh(v,dt); placeVeh(v);
+  b.x=v.x; b.y=v.y; b.z=v.z; b.yaw=v.yaw; b.speedNow=0;
+  // ateş
+  if(ARMED[ty]&&b.vcd<=0&&state==='play'){
+    let tg=null,bd=(ty==='tank'?70:heli?55:48);
+    for(const f of fighters){ if(!f.alive||f.team===b.team||f.air)continue; const d=Math.hypot(f.x-v.x,f.z-v.z); if(d<bd&&canSee(v.x,v.y+2,v.z,f.x,f.y+1,f.z)){ bd=d; tg=f; } }
+    if(tg){
+      const ox=v.x,oy=v.y+2,oz=v.z;
+      if(ty==='tank'){ b.vcd=4.5; const hit=Math.random()<0.55; const tx=tg.x+(hit?0:rnd(-5,5)),tz=tg.z+(hit?0:rnd(-5,5)); tracer(ox,oy,oz,tx,tg.y+1,tz); explodeAt(tx,tg.y+0.5,tz,b,8,170); if(MP.play&&b.bot)mpSend({t:'sh',bot:b.id,ax:+ox.toFixed(2),ay:+oy.toFixed(2),az:+oz.toFixed(2),bx:+tx.toFixed(2),by:+(tg.y+1).toFixed(2),bz:+tz.toFixed(2),w:'alfa7',bm:1}); sndShot(0.5/(1+Math.hypot(v.x-P.x,v.z-P.z)/10),180); }
+      else{ b.vcd=heli?0.2:0.24; const hit=Math.random()<0.35; const tx=tg.x+(hit?0:rnd(-1.8,1.8)),tz=tg.z+(hit?0:rnd(-1.8,1.8)),tyy=tg.y+1.2; tracer(ox,oy,oz,tx,tyy,tz); if(MP.play&&b.bot)mpSend({t:'sh',bot:b.id,ax:+ox.toFixed(2),ay:+oy.toFixed(2),az:+oz.toFixed(2),bx:+tx.toFixed(2),by:+tyy.toFixed(2),bz:+tz.toFixed(2),w:'alfa7'}); if(hit)damage(tg,heli?16:18,b,false); sndShot(0.2/(1+Math.hypot(v.x-P.x,v.z-P.z)/8),700); }
+    } else b.vcd=0.3;
+  }
+}
 /* ---------- Büyük savaş / Rush araçları ---------- */
 const CQV={on:false,saved:null,list:[]};
 function cqvClear(){
@@ -1821,8 +1895,8 @@ function cqvInit(){
   const spots=[], put=(t,x,z,yaw)=>{ const r=VDIM[t][1]+1;
     for(let k=0;k<40;k++){ const xx=x+Math.cos(k*2.4)*k*0.6, zz=z+Math.sin(k*2.4)*k*0.6; if(!hitsBoxes(xx,zz,0.1,3,r)){ spots.push({t,x:xx,z:zz,yaw}); return; } } };
   for(const tm of ['a','o']){ const sg=tm==='a'?1:-1, z0=sg*(MH-19), yaw=tm==='a'?0:Math.PI;
-    put('tank',0,z0,yaw); put('jeep',-11,z0,yaw); put('jeep',11,z0,yaw); put('car',-21,z0,yaw); put('bike',21,z0,yaw); }
-  const fl=TM.flags||[]; if(fl[1])put('car',fl[1][0]+7,fl[1][1],0); if(fl[2])put('car',fl[2][0]-7,fl[2][1],Math.PI);
+    put('tank',0,z0,yaw); put('jeep',-11,z0,yaw); put('jeep',11,z0,yaw); put('car',-21,z0,yaw); put('bike',21,z0,yaw); put('heli',-33,z0-2,yaw); if(MH>130){ put('tank',-30,z0,yaw); put('jeep',30,z0,yaw); } }
+  const fl=TM.flags||[]; for(let k=1;k<fl.length&&k<=(MH>130?6:2);k++){ const ty=k%3===0?'jeep':'car'; put(ty,fl[k][0]+(k%2?7:-7),fl[k][1],k%2?0:Math.PI); }
   for(const sp of spots){
     const m=buildVehicleMesh(sp.t); worldTDM.add(m.g);
     const fig=buildFigure(DRIVER_STY,{}); sitFig(fig,true); fig.g.position.set(m.seat.x,m.seat.y-0.3,m.seat.z); fig.g.visible=false; m.g.add(fig.g);
@@ -1847,7 +1921,7 @@ function setWorld(m){
   try{ if(m!=='tdm')cqvClear(); }catch(e){}
   mode=m; BOXES.length=0; const src=m==='br'?BR.boxes:BOX_TDM; for(let i=0;i<src.length;i++)BOXES.push(src[i]);
   worldTDM.visible=(m==='tdm'); if(BR.grp)BR.grp.visible=(m==='br');
-  const bigT=m==='tdm'&&TM.cq; scene.fog.near=m==='br'?110:bigT?60:28; scene.fog.far=m==='br'?330:bigT?240:115;
+  const bigT=m==='tdm'&&TM.cq; scene.fog.near=m==='br'?110:bigT?60:28; scene.fog.far=m==='br'?330:bigT?(MH>130?330:240):115;
   camera.near=m==='br'?0.1:0.05; camera.far=m==='br'?1200:bigT?500:220; if(BR.plane&&BR.plane.mesh&&m!=='br')BR.plane.mesh.visible=false; camera.updateProjectionMatrix();
   document.body.classList.toggle('br',m==='br');
   try{ const fc=m==='br'?FOG:TM.fog; scene.background.setHex(fc); scene.fog.color.setHex(fc); tintSky(fc); }catch(e){}
@@ -2481,7 +2555,7 @@ function driveHeli(v,dt){
   if(!hitsBoxes(nx,nz,ny+0.2,ny+3.6,2.0)){ v.x=nx; v.z=nz; } else{ const imp=Math.abs(v.speed); if(imp>8)crashHurt((imp-6)*2.5); v.speed*=-0.25; }
   const g=groundAt(v.x,v.z,1.6,v.y);
   if(ny<=g){ if(v.vy<-9)crashHurt((-v.vy-8)*4); ny=g; if(v.vy<0)v.vy=0; }
-  v.y=ny; v.x=clamp(v.x,-BR.half+3,BR.half-3); v.z=clamp(v.z,-BR.half+3,BR.half-3);
+  const HB=mode==='br'?BR.half:MH; v.y=ny; v.x=clamp(v.x,-HB+3,HB-3); v.z=clamp(v.z,-HB+3,HB-3);
   v.pitchV=-(v.speed/30)*0.22; v.roll=v.yawRate*0.2;
 }
 function drivePlane(v,dt){
@@ -2544,7 +2618,7 @@ function updateNear(dt){
   if(P.alive&&!P.air&&!P.veh){
     let bd=2.4; for(const it of ITS){ if(!it.alive)continue; const d=Math.hypot(it.x-P.x,it.z-P.z); if(d<bd&&Math.abs(P.y-(it.y||0))<3.2){ bd=d; BR.nearItem=it; } }
     if(BR.nearItem) txt='E: Al - '+itemName(BR.nearItem);
-    else{ let bv=1e9; for(const v of BR.vehicles){ if(v.occupied&&!(MP.play&&v.type==='jeep'&&v.driver&&!v.pass))continue; const d=Math.hypot(v.x-P.x,v.z-P.z); if(d<VRANGE[v.type]&&d<bv&&Math.abs(v.y-P.y)<3){ bv=d; BR.nearVeh=v; } }
+    else{ let bv=1e9; for(const v of BR.vehicles){ if(v.bot||v.botV)continue; if(v.occupied&&!(MP.play&&v.type==='jeep'&&v.driver&&!v.pass))continue; const d=Math.hypot(v.x-P.x,v.z-P.z); if(d<VRANGE[v.type]&&d<bv&&Math.abs(v.y-P.y)<3){ bv=d; BR.nearVeh=v; } }
       if(BR.nearVeh) txt=BR.nearVeh.occupied?'E: Yolcu olarak bin - '+VNAME[BR.nearVeh.type]:'E: Araca bin - '+VNAME[BR.nearVeh.type]; }
   } else if(P.alive&&P.veh){ const v=P.veh; txt=((v.type==='heli'||v.type==='plane')&&v.y>2.8)?'E: Paraşütle atla (ya da alçalıp in)':'E: Araçtan in'; }
   const pr=$('prompt'); if(txt&&IS_TOUCH_EARLY)txt=txt.replace('E: ','').replace('ile in','düğmesiyle in').replace('sonra E','sonra AL/BİN'); if(txt){ if(pr.textContent!==txt)pr.textContent=txt; pr.style.display='block'; } else pr.style.display='none';
@@ -2686,9 +2760,9 @@ $('greset').addEventListener('click',()=>{ prof={xp:0,level:1,seen:1,loadout:DEF
 /* ---------- Oyun akışı ---------- */
 function clearBots(){ for(const f of fighters){ if(f.mesh)scene.remove(f.mesh); if(f.canopy&&f.canopy.parent)f.canopy.parent.remove(f.canopy); } fighters.length=0; if(P&&P.canopy)scene.remove(P.canopy); if(typeof clearBRThings==='function')clearBRThings(); clearProjs(); }
 function startGame(teamKey){
-  BR.dm=false; initAudio(); clearBots(); CQ.on=soloDom===2; CTF.on=soloDom===3; RU.on=soloDom===4; setTDMMap(pickMapIdx(CQ.on||RU.on,soloMap)); setWorld('tdm'); if(CQ.on||RU.on)cqvInit(); else cqvClear(); if(BR.zoneMesh)BR.zoneMesh.visible=false; applyLoadout(true); gained=0; sessionUnlocks=[]; lvlQ=[]; lvlBusy=false; $('lvl').style.opacity=0;
+  BR.dm=false; initAudio(); clearBots(); CQ.on=soloDom===2; CTF.on=soloDom===3; RU.on=soloDom===4; setTDMMap(pickMapIdx(CQ.on||RU.on,soloMap,undefined,RU.on)); setWorld('tdm'); if(CQ.on||RU.on)cqvInit(); else cqvClear(); if(BR.zoneMesh)BR.zoneMesh.visible=false; applyLoadout(true); gained=0; sessionUnlocks=[]; lvlQ=[]; lvlBusy=false; $('lvl').style.opacity=0;
   const en=teamKey==='a'?'o':'a'; DOM.on=soloDom>=1; DOM.flags.length=0;
-  score.a=CQ.on?CQ_TICKETS:0; score.o=RU.on?1:score.a; timeLeft=CQ.on?600:RU.on?600:MATCH_TIME; hudCache={};
+  score.a=CQ.on?CQ_TICKETS:0; score.o=RU.on?1:score.a; timeLeft=CQ.on?600:RU.on?900:MATCH_TIME; hudCache={};
   P=makeFighter('Sen',teamKey,true,false); P.vx=P.vz=P.vy=0; fighters.push(P);
   const mates=teamKey==='a'?NAMES_A:NAMES_O, foes=teamKey==='a'?NAMES_O:NAMES_A;
   if(CQ.on){ const pool=NAME_POOL.slice().sort(()=>Math.random()-0.5); for(let i=0;i<31;i++) fighters.push(makeFighter(pool[i],teamKey,false,true)); for(let i=0;i<32;i++) fighters.push(makeFighter(pool[31+i],en,false,false)); }
@@ -3011,6 +3085,7 @@ function becomeHost(){
   let n=0;
   for(const f of fighters){ if(!f.bot||!f.remote)continue; n++; f.remote=false; f.fresh=false; f.target=null; f.path=null; f.cd=0.6; f.mesh.visible=true;
     if(f.air&&mode==='br'&&BR.doors.length){ const dd=BR.doors[Math.floor(Math.random()*BR.doors.length)], cxz=navXZ(navFree(navIdx(dd.x,dd.z))); f.dropTx=cxz[0]; f.dropTz=cxz[1]; if(BR.plane&&!BR.plane.over&&f.y>BR.plane.y-10)f.inPlane=true,f.jd=rnd(60,330); } }
+  for(const v of BR.vehicles)if(v.botV){ v.botV=0; v.occupied=false; v.driver=0; v.tgt=null; showDriver(v,false); syncVehBox(v); }
   toast('Kurucu ayrıldı, yeni kurucu sensin'+(n?' - botları sen yönetiyorsun':''),3200);
 }
 function startMP(){ MP.nv=null; $('nvote').classList.remove('on');
@@ -3043,7 +3118,7 @@ function startMP(){ MP.nv=null; $('nvote').classList.remove('on');
     resetVehicles(); buildViewmodels('a'); resetAmmo(); cur=0; selectWeapon(0,true);
     $('goal').textContent=''; $('sa').textContent='Hayatta '+BR.alive;
   }else{
-    DOM.on=(MP.dom|0)>=1; CQ.on=MP.dom===2; CTF.on=MP.dom===3; RU.on=MP.dom===4; DOM.flags.length=0; setTDMMap(pickMapIdx(CQ.on||RU.on,-1,MP.seed)); setWorld('tdm'); if(CQ.on||RU.on)cqvInit(); else cqvClear(); if(BR.zoneMesh)BR.zoneMesh.visible=false; applyLoadout(true);
+    DOM.on=(MP.dom|0)>=1; CQ.on=MP.dom===2; CTF.on=MP.dom===3; RU.on=MP.dom===4; DOM.flags.length=0; setTDMMap(pickMapIdx(CQ.on||RU.on,-1,MP.seed,RU.on)); setWorld('tdm'); if(CQ.on||RU.on)cqvInit(); else cqvClear(); if(BR.zoneMesh)BR.zoneMesh.visible=false; applyLoadout(true);
     score.a=MP.score.a; score.o=MP.score.o; timeLeft=MP.left; if(RU.on)ruInit(); else if(CTF.on)ctfInit(); else if(DOM.on)domInit();
     P=makeFighter(me.name,me.team,true,false); P.vx=P.vz=P.vy=0; P.id=MP.id; me.f=P; fighters.push(P);
     for(const id in MP.players){ const pl=MP.players[id]; if(pl.id!==MP.id)addRemote(pl); }
@@ -3055,7 +3130,7 @@ function startMP(){ MP.nv=null; $('nvote').classList.remove('on');
   document.body.classList.add('playing'); for(const id of ['entry','lobby','menu','end','pause'])$(id).classList.remove('on');
   $('pLeave').style.display='inline-block'; lockPointer();
 }
-function nvName(o){ return o.mode==='br'?'Battle Royale (16 kişi)':o.mode==='dm'?'Ölüm maçı · Battle Royale haritası':(o.dom===2?'Büyük savaş 32v32':o.dom===4?'Rush (M-COM)':o.dom===3?'Bayrak kapma (CTF)':o.dom===1?'Bayrak ele geçirme':'Takım savaşı')+' · '+MAPS[pickMapIdx(o.dom===2,-1,o.seed)].name; }
+function nvName(o){ return o.mode==='br'?'Battle Royale (16 kişi)':o.mode==='dm'?'Ölüm maçı · Battle Royale haritası':(o.dom===2?'Büyük savaş 32v32':o.dom===4?'Rush (M-COM)':o.dom===3?'Bayrak kapma (CTF)':o.dom===1?'Bayrak ele geçirme':'Takım savaşı')+' · '+MAPS[pickMapIdx(o.dom===2||o.dom===4,-1,o.seed,o.dom===4)].name; }
 function renderNv(){
   const nv=MP.nv, el=$('nvote'); if(!nv||MP.play){ el.classList.remove('on'); return; }
   const left=Math.max(0,Math.ceil((nv.ms-(performance.now()-nv.t0))/1000));
@@ -3108,7 +3183,10 @@ function mpMsg(m){
     case 'voteend': hideVote(); if(!m.ok){ if(!MP.play){ $('lbWait').textContent=(m.msg||'Teklif kabul edilmedi.')+(m.rej?' (Ret: '+m.rej+', Kabul: '+m.acc+')':''); toast(m.msg||'Teklif kabul edilmedi.',3000); } } break;
     case 'start': MP.phase='play'; MP.mode=m.mode; MP.dom=m.dom|0; MP.seed=m.seed; MP.score=m.score; MP.left=m.left; fillPlayers(m.ents); MP.spec=false; startMP(); break;
     case 'st': { if(!MP.play)break; const pl=MP.players[m.id]; if(!pl||!pl.f)break; const f=pl.f; f.tx=m.x; f.ty=m.y; f.tz=m.z; f.tyaw=m.yaw; f.spd=m.s; f.air=!!(m.a||m.iv); f.iv=!!m.iv; if(f.fresh){ f.x=m.x; f.y=m.y; f.z=m.z; f.yaw=m.yaw; f.fresh=false; } setRemoteWeapon(f,m.w); break; }
-    case 'bs': { if(!MP.play||MP.host===MP.id)break; for(const q of m.b){ const pl=MP.players[q[0]]; if(!pl||!pl.f||!pl.f.remote)continue; const f=pl.f; f.tx=q[1]; f.ty=q[2]; f.tz=q[3]; f.tyaw=q[4]; f.spd=q[5]; f.air=!!q[6]; if(f.fresh){ f.x=q[1]; f.y=q[2]; f.z=q[3]; f.yaw=q[4]; f.fresh=false; } setRemoteWeapon(f,q[7]); } break; }
+    case 'bs': { if(!MP.play||MP.host===MP.id)break; for(const q of m.b){ const pl=MP.players[q[0]]; if(!pl||!pl.f||!pl.f.remote)continue; const f=pl.f; f.tx=q[1]; f.ty=q[2]; f.tz=q[3]; f.tyaw=q[4]; f.spd=q[5]; f.air=!!q[6]; f.iv=!!q[8]; if(f.fresh){ f.x=q[1]; f.y=q[2]; f.z=q[3]; f.yaw=q[4]; f.fresh=false; } setRemoteWeapon(f,q[7]); }
+      if(CQV.on){ const seen={}; for(const q of (m.v||[])){ const v=BR.vehicles[q[0]]; if(!v)continue; seen[q[0]]=1; v.occupied=true; v.driver=q[5]; v.tgt={x:q[1],y:q[2],z:q[3],yaw:q[4]}; v.botV=1; showDriver(v,true); syncVehBox(v); }
+        for(const v of BR.vehicles)if(v.botV&&!seen[v.idx]){ v.botV=0; v.occupied=false; v.driver=0; v.tgt=null; showDriver(v,false); syncVehBox(v); } }
+      break; }
     case 'sh': { const f=pf(m.id); if(!MP.play||!f||f===P)break; tracer(m.ax,m.ay,m.az,m.bx,m.by,m.bz); if(m.bm)boomFx(m.bx,m.by,m.bz); f.flash.visible=true; f.flashT=0.05; f.firedT=1.2; const w=WBYID[m.w]||WBYID.alfa7; sndShot(0.28/(1+Math.hypot(f.x-P.x,f.z-P.z)/7),w.pitch); break; }
     case 'gad': { const f=pf(m.id); if(MP.play&&P&&f&&f!==P&&f.team===P.team&&m.k==='rally'&&f.sq){ setRally(f.sq,m.x,m.z,false); break; } if(MP.play&&P&&f&&f!==P&&f.team===P.team&&m.k==='crate'){ dropCrate(m.c==='h'?'h':'a',m.x,m.z,f.team); break; }
       if(MP.play&&P&&P.alive&&f&&f!==P&&f.team===P.team&&m.k==='ammo'&&Math.hypot(m.x-P.x,m.z-P.z)<8){ refillAmmo(); toast('İkmal alındı'); } break; }
@@ -3125,7 +3203,7 @@ function mpMsg(m){
     case 'dfl': if(MP.play&&DOM.on&&MP.host!==MP.id){ m.fl.forEach((q,i)=>{ const fl=DOM.flags[i]; if(fl){ fl.prog=q[0]; fl.own=q[1]; } }); } break;
     case 'kill': {
       if(!MP.play)break; const k=m.k?pf(m.k):null, v=pf(m.v); if(!v)break;
-      v.alive=false; v.deaths++; if(k&&k!==v)k.kills++; if(MP.players[m.v])MP.players[m.v].deaths=v.deaths; if(k&&MP.players[m.k])MP.players[m.k].kills=k.kills;
+      if(v.veh)botExit(v,true); v.alive=false; v.deaths++; if(k&&k!==v)k.kills++; if(MP.players[m.v])MP.players[m.v].deaths=v.deaths; if(k&&MP.players[m.k])MP.players[m.k].kills=k.kills;
       const vc='<span style="color:'+(v.css||TEAM[v.team].css)+'">'+v.name+'</span>';
       if(k&&k!==v) feed('<span style="color:'+(k.css||TEAM[k.team].css)+'">'+k.name+'</span> '+(m.head?'(kafadan) ':'')+'→ '+vc);
       else feed(vc+' '+(m.why==='left'?'savaştan ayrıldı':m.why==='zone'?'çemberde / kazada elendi':'kendini patlattı'));
@@ -3237,7 +3315,7 @@ function frame(t){
     if(MP.play){
       MP.sendT-=dt; if(MP.sendT<=0){ MP.sendT=0.066; if(P.alive)mpSend({t:'st',x:+P.x.toFixed(2),y:+P.y.toFixed(2),z:+P.z.toFixed(2),yaw:+P.yaw.toFixed(3),w:LOADOUT[cur].id,s:+Math.hypot(P.vx,P.vz).toFixed(2),a:P.air?1:0,iv:P.veh?1:0}); }
       if(P.veh){ MP.vstT-=dt; if(MP.vstT<=0){ MP.vstT=0.066; const v=P.veh; if(P.seat===1)mpSend({t:'vst',i:v.idx,g:1,ty:+(v.ty||0).toFixed(3)}); else mpSend({t:'vst',i:v.idx,ty:+(v.ty||0).toFixed(3),x:+v.x.toFixed(2),y:+v.y.toFixed(2),z:+v.z.toFixed(2),yaw:+v.yaw.toFixed(3),pv:+(v.pitchV||0).toFixed(3),roll:+(v.roll||0).toFixed(3),spd:+v.speed.toFixed(2),rot:+(v.rotor||0).toFixed(2),thr:+(v.thr||0).toFixed(2)}); } }
-      if(MP.host===MP.id){ MP.bsT-=dt; if(MP.bsT<=0){ MP.bsT=0.08; const b=[]; for(const f of fighters) if(f.bot&&!f.remote&&f.alive) b.push([f.id,+f.x.toFixed(2),+f.y.toFixed(2),+f.z.toFixed(2),+f.yaw.toFixed(3),+(f.speedNow||0).toFixed(1),f.air?1:0,f.wp.id]); if(b.length)mpSend({t:'bs',b}); } }
+      if(MP.host===MP.id){ MP.bsT-=dt; if(MP.bsT<=0){ MP.bsT=0.08; const b=[]; for(const f of fighters) if(f.bot&&!f.remote&&f.alive) b.push([f.id,+f.x.toFixed(2),+f.y.toFixed(2),+f.z.toFixed(2),+f.yaw.toFixed(3),+(f.speedNow||0).toFixed(1),f.air?1:0,f.wp.id,f.veh?1:0]); const vs=CQV.on?BR.vehicles.filter(v=>v.bot&&v.bot.alive).map(v=>[v.idx,+v.x.toFixed(2),+v.y.toFixed(2),+v.z.toFixed(2),+v.yaw.toFixed(3),v.bot.id]):[]; if(b.length)mpSend({t:'bs',b,v:vs}); } }
     }
     P.firedT=Math.max(0,P.firedT-dt);
     if(mode==='br')updateBR(dt);
