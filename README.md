@@ -143,3 +143,7 @@ yalnızca DoS'u kesiyor, hileyi kesmiyor.
 
 ## UH-60 Kara Şahin helikopteri
 - Helikopter modeli koyu renkli UH-60 (Kara Şahin) olarak yenilendi: dört kanatlı ana rotor, eğik kuyruk dikmesi ve kırmızı-beyaz yuvarlak işaret, kayar kapı panelleri, kısa kanatçık ve silah kapsülleri. Battle Royale ve Rush/Büyük savaştaki tüm helikopterlerde aynı model kullanılır.
+
+## Botlar helikoptere biner (pilot + 2 mürettebat)
+- Botlar boş helikoptere pilot olarak biner; yerdeyken 6 sn içinde yanındaki en çok 2 bot mürettebat olarak biner, hepsi birlikte kalkar, yerden düşmana ateş eder. Heli 50 sn sonra alçalıp iner, hepsi iner. Pilot ölürse mürettebat da düşer.
+- Battle Royale'de de botlar helikopter/araç kullanır (çember merkezine doğru); Rush/Büyük savaşta yalnız saldırgan botlar biner.
