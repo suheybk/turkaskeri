@@ -158,7 +158,7 @@ export class Room {
   constructor() {
     this.inited = false; this.pw = ''; this.players = new Map(); this.bots = new Map();
     this.nextId = 1; this.nextBot = 101; this.mode = 'tdm'; this.phase = 'lobby';
-    this.score = { a: 0, o: 0 }; this.dom = 0; this.dsT = 0; this.left = MATCH; this.host = null; this.timer = null; this.tick = 0;
+    this.score = { a: 0, o: 0 }; this.dom = 0; this.dsT = 0; this.nv = null; this.nextSeed = null; this.left = MATCH; this.host = null; this.timer = null; this.tick = 0;
     this.pwFail = { n: 0, until: 0 };
     this.vote = null; this.picked = new Set(); this.veh = new Map(); this.veh2 = new Map(); this.alive = 0; this.seed = 1;
   }
@@ -250,7 +250,26 @@ export class Room {
   }
 
   /* ---- oylama ve başlatma ---- */
+  clearNv() { if (this.nv) { clearTimeout(this.nv.timer); this.nv = null; } }
+  beginNv() {
+    if (this.phase !== 'end' || !this.players.size) return;
+    const pool = [['tdm', 0], ['tdm', 1], ['tdm', 2], ['br', 0], ['dm', 0]].sort(() => Math.random() - 0.5), opts = [];
+    for (const [mode, dom] of pool) { if (opts.length >= 3) break; opts.push({ mode, dom, seed: (Math.random() * 2147483647) | 0 }); }
+    this.clearNv(); this.nv = { opts, votes: new Map(), timer: setTimeout(() => this.endNv(), 13000) };
+    this.bcast({ t: 'nvote', ms: 13000, opts });
+  }
+  endNv() {
+    const nv = this.nv; if (!nv) return; this.nv = null;
+    if (this.phase !== 'end' || !this.players.size) return;
+    const cnt = nv.opts.map(() => 0); for (const v of nv.votes.values()) cnt[v]++;
+    const mx = Math.max(...cnt), best = cnt.map((c, i) => (c === mx ? i : -1)).filter((i) => i >= 0), o = nv.opts[best[Math.floor(Math.random() * best.length)]];
+    this.mode = o.mode; this.dom = o.mode === 'tdm' ? o.dom : 0; this.nextSeed = o.seed; this.normalize();
+    if (this.bots.size || this.dom === 2 || this.mode !== 'tdm') this.fillBots();
+    this.sendLobby(); this.bcast({ t: 'nvend', mode: this.mode, dom: this.dom });
+    setTimeout(() => { if (this.phase === 'end' && this.players.size) this.startMatch(); }, 3000);
+  }
   startVote(p) {
+    this.clearNv();
     if (this.phase === 'play' || this.vote) return;
     const total = this.all().filter((e) => !e.spec).length;
     if (this.mode !== 'tdm' && total < 2) return this.send(p, { t: 'err', msg: 'Bu mod için en az 2 oyuncu (bot dahil) gerekir. Bot ekle.' });
@@ -268,7 +287,7 @@ export class Room {
     else { this.bcast({ t: 'voteend', ok: true, rej, acc }); this.startMatch(); }
   }
   startMatch() {
-    this.phase = 'play'; const cq = this.mode === 'tdm' && this.dom === 2; this.score = cq ? { a: CQ_T, o: CQ_T } : { a: 0, o: 0 }; this.left = this.mode === 'dm' ? MATCH_DM : cq ? 600 : MATCH; this.seed = (Math.random() * 2147483647) | 0;
+    this.phase = 'play'; const cq = this.mode === 'tdm' && this.dom === 2; this.score = cq ? { a: CQ_T, o: CQ_T } : { a: 0, o: 0 }; this.left = this.mode === 'dm' ? MATCH_DM : cq ? 600 : MATCH; this.seed = this.nextSeed != null ? this.nextSeed : (Math.random() * 2147483647) | 0; this.nextSeed = null;
     this.picked.clear(); this.veh.clear(); this.veh2.clear();
     for (const e of this.all()) { e.kills = 0; e.deaths = 0; e.alive = true; e.spec = false; e.hp = this.hpFor(e); e.lastHit = 0; e.place = 0; e.armor = 0; }
     this.alive = this.all().length;
@@ -295,6 +314,7 @@ export class Room {
     if (this.mode === 'tdm') win = this.score.a === this.score.o ? null : (this.score.a > this.score.o ? 'a' : 'o');
     else if (this.mode === 'dm') { let w = null; for (const e of this.all()) if (!e.spec && (!w || e.kills > w.kills)) w = e; win = w && w.kills > 0 ? w.id : 0; }
     else { const w = this.all().find((e) => e.alive && !e.spec); win = w ? w.id : 0; if (w) w.place = 1; }
+    setTimeout(() => this.beginNv(), 2500);
     this.bcast({ t: 'end', mode: this.mode, win, score: this.score, ents: this.all().filter((e) => !e.spec).map((e) => Object.assign(this.pub(e), { place: e.place || 0 })) });
     this.sendLobby();
   }
@@ -326,8 +346,9 @@ export class Room {
     const lobbyOK = this.phase !== 'play' && !this.vote;
     switch (m.t) {
       /* kurucu ayarları */
-      case 'mode': if (isHost && lobbyOK && (m.mode === 'tdm' || m.mode === 'br' || m.mode === 'dm')) { this.mode = m.mode; if (this.mode !== 'tdm') this.dom = 0; this.normalize(); this.sendLobby(); } break;
-      case 'dom': if (isHost && lobbyOK && this.mode === 'tdm') { this.dom = Math.max(0, Math.min(2, num(m.on) | 0)); this.normalize(); this.sendLobby(); } break;
+      case 'mode': if (isHost && lobbyOK && (m.mode === 'tdm' || m.mode === 'br' || m.mode === 'dm')) { this.clearNv(); this.mode = m.mode; if (this.mode !== 'tdm') this.dom = 0; this.normalize(); this.sendLobby(); } break;
+      case 'nv': if (this.nv && this.phase === 'end') { const i = num(m.i) | 0; if (i >= 0 && i < this.nv.opts.length) { this.nv.votes.set(p.id, i); const c = this.nv.opts.map(() => 0); for (const v of this.nv.votes.values()) c[v]++; this.bcast({ t: 'nvc', c }); } } break;
+      case 'dom': if (isHost && lobbyOK && this.mode === 'tdm') { this.clearNv(); this.dom = Math.max(0, Math.min(2, num(m.on) | 0)); this.normalize(); this.sendLobby(); } break;
       case 'addbot': if (isHost && lobbyOK) { this.addBot(m.team === 'o' ? 'o' : 'a'); this.sendLobby(); } break;
       case 'fillbots': if (isHost && lobbyOK) { this.fillBots(); this.sendLobby(); } break;
       case 'clearbots': if (isHost && lobbyOK) { this.bots.clear(); this.sendLobby(); } break;

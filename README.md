@@ -109,3 +109,9 @@ yalnızca DoS'u kesiyor, hileyi kesmiyor.
 ### Sınıf silah kısıtı ve aksesuarlar
 - Takım savaşı / bayrak / büyük savaşta silahlar sınıfa göre gelir (Asalt: tüfekler, Sağlıkçı: karabina/SMG, Destek: ağır makineli + tüfek, Nişancı: nişancı tüfekleri, Mühendis: SMG/av tüfeği); sınıfın ilk silahı seviyeden bağımsız açıktır. Yanında her zaman tabanca.
 - Silah başına öldürmeyle aksesuar açılır: 15 öldürme dikey kabza, 40 uzun şarjör, 80 susturucu; sonraki maçta otomatik takılır. Sayaçlar profile (`wk`) kaydedilir.
+
+### Takım (squad) sistemi
+- Her takım 4'lü squad'lara bölünür (çok oyunculuda oyuncu kimliğine göre, hepsinde aynı). Sol altta radar altında squad listesi (can çubuklarıyla). Lider (★) **T** ile toplanma noktası kurar (25 sn bekleme, 90 sn / 6 doğuş); squad üyeleri orada doğar. Botlar liderini izler.
+
+### Maç sonu oylaması ve harita rotasyonu
+- Maç bitince sunucu 3 rastgele seçenek (mod + harita) sunar, 13 sn oylanır, kazanan 3 sn sonra otomatik başlar. Kurucu manuel başlatırsa oylama iptal olur.

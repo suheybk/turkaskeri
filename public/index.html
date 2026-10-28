@@ -98,6 +98,8 @@ body.touch #squad{top:calc(124px + var(--sat));font-size:11px}
 #menu .sub{margin-top:10px;font-size:22px;font-weight:600;color:rgba(236,232,216,.7)}
 .teams{display:flex;gap:16px;margin-top:34px;flex-wrap:wrap;justify-content:center}
 .mapsel,#mapsel,.chips{pointer-events:auto;display:flex;gap:6px;justify-content:center;margin:10px 0 4px;flex-wrap:wrap}
+#nvote{margin:10px 0;display:none;flex-direction:column;gap:6px;align-items:center} #nvote.on{display:flex} #nvote b{color:#9bd07a} #nvote button{background:rgba(20,24,20,.8);color:var(--bone);border:1px solid #5d6455;padding:5px 12px;font:inherit;font-size:14px;cursor:pointer;min-width:260px}
+#end{overflow-y:auto} #nvote button.me{background:#7fb35f;color:#10140e}
 #clsdesc{text-align:center;font-size:14px;color:#b9c4a8;min-height:18px}
 #mapsel button,.chips button{background:rgba(20,24,20,.7);color:var(--bone);border:1px solid #5d6455;padding:5px 12px;font:inherit;font-size:14px;cursor:pointer;letter-spacing:.04em}
 #mapsel button.on,.chips button.on{background:#7fb35f;color:#10140e;border-color:#9bd07a}
@@ -427,7 +429,7 @@ body.touch.useok #tuse{display:flex}
 <div id="rotate"><b>&#x21BB;</b>Oynamak için telefonu yatay çevir</div>
 
 <div id="pause" class="screen"><h2 class="stencil">Duraklatıldı</h2><p>Devam etmek için tıkla</p><button class="btn alt" id="pLeave" style="display:none">Odadan ayrıl</button></div>
-<div id="end" class="screen"><h2 class="stencil" id="endt"></h2><p id="ends"></p><p id="endx" style="max-width:660px"></p><button class="btn" id="again">Menüye dön</button></div>
+<div id="end" class="screen"><h2 class="stencil" id="endt"></h2><p id="ends"></p><p id="endx" style="max-width:660px"></p><div id="nvote"></div><button class="btn" id="again">Menüye dön</button></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -2834,7 +2836,7 @@ function becomeHost(){
     if(f.air&&mode==='br'&&BR.doors.length){ const dd=BR.doors[Math.floor(Math.random()*BR.doors.length)], cxz=navXZ(navFree(navIdx(dd.x,dd.z))); f.dropTx=cxz[0]; f.dropTz=cxz[1]; if(BR.plane&&!BR.plane.over&&f.y>BR.plane.y-10)f.inPlane=true,f.jd=rnd(60,330); } }
   toast('Kurucu ayrıldı, yeni kurucu sensin'+(n?' - botları sen yönetiyorsun':''),3200);
 }
-function startMP(){
+function startMP(){ MP.nv=null; $('nvote').classList.remove('on');
   initAudio(); clearBots(); const br=MP.mode==='br', dm=MP.mode==='dm', me=MP.players[MP.id]; BR.dm=dm;
   gained=0; sessionUnlocks=[]; lvlQ=[]; lvlBusy=false; $('lvl').style.opacity=0; hudCache={}; MP.dc=0; MP.bsT=0; MP.vstT=0; MP.specT=null; hideVote();
   if(dm){
@@ -2875,6 +2877,15 @@ function startMP(){
   MP.play=true; MP.wasPlaying=true; MP.sendT=0; state='play'; paused=false; fallback=false; document.body.classList.remove('nolock'); if(!br&&!dm)P.pitch=0;
   document.body.classList.add('playing'); for(const id of ['entry','lobby','menu','end','pause'])$(id).classList.remove('on');
   $('pLeave').style.display='inline-block'; lockPointer();
+}
+function nvName(o){ return o.mode==='br'?'Battle Royale (16 kişi)':o.mode==='dm'?'Ölüm maçı · Battle Royale haritası':(o.dom===2?'Büyük savaş 32v32':o.dom===1?'Bayrak ele geçirme':'Takım savaşı')+' · '+MAPS[pickMapIdx(o.dom===2,-1,o.seed)].name; }
+function renderNv(){
+  const nv=MP.nv, el=$('nvote'); if(!nv||MP.play){ el.classList.remove('on'); return; }
+  const left=Math.max(0,Math.ceil((nv.ms-(performance.now()-nv.t0))/1000));
+  el.innerHTML='<b>Sonraki maç için oy ver ('+left+' sn)</b>'+nv.opts.map((o,i)=>'<button data-i="'+i+'" class="'+(nv.me===i?'me':'')+'">'+nvName(o)+'  —  '+nv.c[i]+' oy</button>').join('');
+  el.classList.add('on');
+  el.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{ nv.me=+b.dataset.i; mpSend({t:'nv',i:nv.me}); renderNv(); }));
+  clearTimeout(renderNv.t); if(left>0)renderNv.t=setTimeout(renderNv,1000);
 }
 function mpEnd(m){
   if(!MP.play)return; MP.play=false; state='end'; MP.phase='end'; hideVote();
@@ -2925,6 +2936,9 @@ function mpMsg(m){
     case 'gad': { const f=pf(m.id); if(MP.play&&P&&f&&f!==P&&f.team===P.team&&m.k==='rally'&&f.sq){ setRally(f.sq,m.x,m.z,false); break; } if(MP.play&&P&&P.alive&&f&&f!==P&&f.team===P.team&&m.k==='ammo'&&Math.hypot(m.x-P.x,m.z-P.z)<8){ refillAmmo(); toast('İkmal alındı'); } break; }
     case 'nade': { const f=pf(m.id); if(MP.play&&f&&f!==P)spawnProj(m.k,f,m.x,m.y,m.z,m.vx,m.vy,m.vz); break; }
     case 'hp': if(MP.play&&P){ if(m.hp<P.hp-0.5){ hurtT=0.7; } P.hp=m.hp; if(m.ar!=null)P.armor=m.ar; } break;
+    case 'nvote': { MP.nv={opts:m.opts,c:m.opts.map(()=>0),me:-1,t0:performance.now(),ms:m.ms}; renderNv(); break; }
+    case 'nvc': if(MP.nv){ MP.nv.c=m.c; renderNv(); } break;
+    case 'nvend': { MP.nv=null; $('nvote').classList.remove('on'); break; }
     case 'time': timeLeft=m.left; break;
     case 'dsc': if(MP.play&&mode==='tdm'){ score.a=m.score.a; score.o=m.score.o; updateScoreHud(); } break;
     case 'dfl': if(MP.play&&DOM.on&&MP.host!==MP.id){ m.fl.forEach((q,i)=>{ const fl=DOM.flags[i]; if(fl){ fl.prog=q[0]; fl.own=q[1]; } }); } break;
