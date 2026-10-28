@@ -349,7 +349,7 @@ body.touch.useok #tuse{display:flex}
   <p class="enote">Oyun kodu</p>
   <div class="bigcode stencil" id="lbCode">-----</div>
   <p class="enote" id="lbPw" style="margin-top:8px"></p>
-  <div class="etabs" id="lbMode" style="margin-top:12px"><button data-m="tdm">Takım savaşı</button><button data-m="br">Battle Royale</button><button data-m="dm">Ölüm maçı</button></div>
+  <div class="etabs" id="lbMode" style="margin-top:12px"><button data-m="tdm">Takım savaşı</button><button data-m="flag">Bayrak</button><button data-m="br">Battle Royale</button><button data-m="dm">Ölüm maçı</button></div>
   <div class="lbteams" id="lbTeams">
     <div class="lbt a"><h3>Alfa</h3><ul id="lbA"></ul><button class="lnk lbab" data-act="ab" data-team="a">+ Bot ekle</button></div>
     <div class="lbt o"><h3>Özel Harekât</h3><ul id="lbO"></ul><button class="lnk lbab" data-act="ab" data-team="o">+ Bot ekle</button></div>
@@ -1202,7 +1202,7 @@ let flashT=0,vmKick=0,adsK=0,bobT=0,underW=false;
 /* ---------- Botlar ---------- */
 function pickGoal(b){
   if(mode==='br'){ pickGoalBR(b); return; }
-  if(DOM.on&&!MP.play&&DOM.flags.length&&Math.random()<0.8){
+  if(DOM.on&&DOM.flags.length&&Math.random()<0.8){
     let fl=null,bd=1e9; for(const q of DOM.flags){ const open=q.own!==b.team||Math.abs(q.prog)<0.99; const d=Math.hypot(q.x-b.x,q.z-b.z)+(open?0:60)+Math.random()*25; if(d<bd){bd=d;fl=q;} }
     if(fl){ setPathTo(b,nearestNode(fl.x+rnd(-3,3),fl.z+rnd(-3,3),true)); return; }
   }
@@ -1440,7 +1440,7 @@ function drawRadar(dt){
   rc.clearRect(0,0,S,S);
   for(const b of BOXES){ if(b.kind==='wall')continue; rc.fillStyle=b.h>2?'rgba(150,154,144,.75)':'rgba(110,114,104,.6)';
     rc.fillRect((b.minx+o)*k,(b.minz+o)*k,b.w*k,b.d*k); }
-  if(DOM.on&&!MP.play) for(const q of DOM.flags){ rc.strokeStyle=q.own?(q.own==='a'?'#4a8fc4':'#e0812f'):'#cfcfcf'; rc.lineWidth=2; rc.beginPath(); rc.arc((q.x+o)*k,(q.z+o)*k,5,0,6.3); rc.stroke(); }
+  if(DOM.on) for(const q of DOM.flags){ rc.strokeStyle=q.own?(q.own==='a'?'#4a8fc4':'#e0812f'):'#cfcfcf'; rc.lineWidth=2; rc.beginPath(); rc.arc((q.x+o)*k,(q.z+o)*k,5,0,6.3); rc.stroke(); }
   for(const f of fighters){ if(!f.alive||f.isPlayer)continue; const x=(f.x+o)*k,y=(f.z+o)*k;
     if(f.side===P.side){ rc.fillStyle='#9be28f'; rc.beginPath(); rc.arc(x,y,3.2,0,6.3); rc.fill(); }
     else if(f.spotted){ rc.fillStyle='#e5483a'; rc.beginPath(); rc.moveTo(x,y-4.5); rc.lineTo(x+4.5,y); rc.lineTo(x,y+4.5); rc.lineTo(x-4.5,y); rc.closePath(); rc.fill(); } }
@@ -1529,16 +1529,23 @@ function domInit(){
   });
 }
 function domUpdate(dt){
+  const auth=!MP.play||MP.host===MP.id;
+  if(auth){
+    for(const fl of DOM.flags){
+      let na=0,no=0; for(const f of fighters){ if(!f.alive||f.air)continue; if(Math.hypot(f.x-fl.x,f.z-fl.z)<5){ if(f.team==='a')na++; else no++; } }
+      const df=na-no; if(df!==0)fl.prog=clamp(fl.prog+Math.sign(df)*Math.min(3,Math.abs(df))*dt*0.22,-1,1);
+      if(fl.prog>=1)fl.own='a'; else if(fl.prog<=-1)fl.own='o'; else if(fl.own==='a'&&fl.prog<=0)fl.own=''; else if(fl.own==='o'&&fl.prog>=0)fl.own='';
+    }
+    DOM.tk+=dt; if(DOM.tk>=2){ DOM.tk-=2; let ca=0,co=0; for(const fl of DOM.flags){ if(fl.own==='a')ca++; else if(fl.own==='o')co++; }
+      if(MP.play)mpSend({t:'dscore',a:ca,o:co}); else{ score.a+=ca; score.o+=co; updateScoreHud(); if(score.a>=DOM_TARGET||score.o>=DOM_TARGET)endMatch(); } }
+    if(MP.play){ DOM.fT=(DOM.fT||0)-dt; if(DOM.fT<=0){ DOM.fT=0.4; mpSend({t:'dfl',fl:DOM.flags.map(q=>[+q.prog.toFixed(2),q.own])}); } }
+  }
   const GR=new THREE.Color(0xcfcfcf),CA=new THREE.Color(TEAM.a.col),CO=new THREE.Color(TEAM.o.col);
   for(const fl of DOM.flags){
-    let na=0,no=0; for(const f of fighters){ if(!f.alive||f.air)continue; if(Math.hypot(f.x-fl.x,f.z-fl.z)<5){ if(f.team==='a')na++; else no++; } }
-    const df=na-no; if(df!==0)fl.prog=clamp(fl.prog+Math.sign(df)*Math.min(3,Math.abs(df))*dt*0.22,-1,1);
-    const prev=fl.own; if(fl.prog>=1)fl.own='a'; else if(fl.prog<=-1)fl.own='o'; else if(fl.own==='a'&&fl.prog<=0)fl.own=''; else if(fl.own==='o'&&fl.prog>=0)fl.own='';
-    if(fl.own!==prev)toast('Bayrak '+fl.n+(fl.own?': '+TEAM[fl.own].name+' ele geçirdi':': tarafsız'),1800);
+    if(fl.own!==fl.shown){ if(fl.shown!==undefined)toast('Bayrak '+fl.n+(fl.own?': '+TEAM[fl.own].name+' ele geçirdi':': tarafsız'),1800); fl.shown=fl.own; }
     const col=GR.clone().lerp(fl.prog>0?CA:CO,Math.abs(fl.prog)); fl.cm.color.copy(col); fl.rm.color.copy(col);
     fl.cloth.position.y=2.4+1.2*(fl.own?1:Math.abs(fl.prog)*0.8);
   }
-  DOM.tk+=dt; if(DOM.tk>=2){ DOM.tk-=2; for(const fl of DOM.flags)if(fl.own)score[fl.own]++; updateScoreHud(); if(score.a>=DOM_TARGET||score.o>=DOM_TARGET)endMatch(); }
   DOM.uiT-=dt; if(DOM.uiT<=0){ DOM.uiT=0.3; $('goal').innerHTML='Bayrak ele geçirme ('+DOM_TARGET+' puan)   |   '+DOM.flags.map(q=>'<b style="color:'+(q.own?TEAM[q.own].css:'#ddd')+'">'+q.n+(q.own?'●':'○')+'</b>').join(' '); }
 }
 /* ---------- Battle Royale dünyası ---------- */
@@ -2653,7 +2660,7 @@ function entLi(p,host,br){
 function renderLobby(){
   const host=MP.host===MP.id, br=MP.mode!=='tdm', list=Object.values(MP.players), nb=list.filter(p=>p.bot).length;
   $('lbCode').textContent=MP.code; $('lbPw').textContent=MP.myPw?('Şifre: '+MP.myPw):(MP.pwSet?'Bu oyun şifreli.':'Bu oyun şifresiz.');
-  document.querySelectorAll('#lbMode button').forEach(b=>{ b.classList.toggle('on',b.dataset.m===MP.mode); b.disabled=!host; });
+  document.querySelectorAll('#lbMode button').forEach(b=>{ b.classList.toggle('on',b.dataset.m==='flag'?(MP.mode==='tdm'&&!!MP.dom):(b.dataset.m===MP.mode&&!(MP.mode==='tdm'&&MP.dom))); b.disabled=!host; });
   $('lbTeams').style.display=br?'none':'flex'; $('lbAllBox').style.display=br?'block':'none';
   if(br){ $('lbAllH').textContent='Oyuncular ('+list.length+'/16)'; $('lbAll').innerHTML=list.map(p=>entLi(p,host,true)).join(''); }
   else for(const t of ['a','o']) $(t==='a'?'lbA':'lbO').innerHTML=list.filter(p=>p.team===t).map(p=>entLi(p,host,false)).join('');
@@ -2671,7 +2678,7 @@ let voteTimer=null;
 function hideVote(){ $('vote').classList.remove('on'); clearInterval(voteTimer); MP.vote=null; }
 function showVote(m){
   if(!MP.play){ for(const id of ['entry','menu','end','pause','gear'])$(id).classList.remove('on'); $('lobby').classList.add('on'); state='menu'; }
-  const host=MP.host===MP.id, mn=m.mode==='br'?'Battle Royale':m.mode==='dm'?'Ölüm maçı (ilk 40 öldürme)':'Takım savaşı';
+  const host=MP.host===MP.id, mn=m.mode==='br'?'Battle Royale':m.mode==='dm'?'Ölüm maçı (ilk 40 öldürme)':m.dom?'Bayrak ele geçirme (100 puan)':'Takım savaşı';
   MP.vote={t0:performance.now(),ms:m.ms,done:host};
   $('vTitle').textContent=host?'Teklifin gönderildi':(m.host+' oyunu başlatmak istiyor');
   $('vInfo').textContent=mn+' · '+m.humans+' oyuncu, '+m.bots+' bot';
@@ -2745,12 +2752,12 @@ function startMP(){
     resetVehicles(); buildViewmodels('a'); resetAmmo(); cur=0; selectWeapon(0,true);
     $('goal').textContent=''; $('sa').textContent='Hayatta '+BR.alive;
   }else{
-    DOM.on=false; setTDMMap((MP.seed>>>0)%MAPS.length); setWorld('tdm'); if(BR.zoneMesh)BR.zoneMesh.visible=false; applyLoadout();
+    DOM.on=!!MP.dom; DOM.flags.length=0; setTDMMap((MP.seed>>>0)%MAPS.length); setWorld('tdm'); if(BR.zoneMesh)BR.zoneMesh.visible=false; applyLoadout();
     score.a=MP.score.a; score.o=MP.score.o; timeLeft=MP.left;
     P=makeFighter(me.name,me.team,true,false); P.vx=P.vz=P.vy=0; P.id=MP.id; me.f=P; fighters.push(P);
     for(const id in MP.players){ const pl=MP.players[id]; if(pl.id!==MP.id)addRemote(pl); }
-    buildViewmodels(me.team); resetAmmo(); respawn(P);
-    updateScoreHud(); $('goal').textContent='İlk 30 öldürmeye ulaşan kazanır   |   Harita: '+TM.name;
+    buildViewmodels(me.team); resetAmmo(); respawn(P); if(DOM.on)domInit();
+    updateScoreHud(); $('goal').textContent=DOM.on?'Bayrak ele geçirme':'İlk 30 öldürmeye ulaşan kazanır   |   Harita: '+TM.name;
   }
   $('feed').innerHTML=''; $('dead').style.display='none'; $('hint').style.display='none'; $('prompt').style.display='none'; $('vinfo').style.display='none';
   MP.play=true; MP.wasPlaying=true; MP.sendT=0; state='play'; paused=false; fallback=false; document.body.classList.remove('nolock'); if(!br&&!dm)P.pitch=0;
@@ -2788,10 +2795,10 @@ const brItem=id=>(BR.items||[]).find(x=>x.id===id);
 function mpMsg(m){
   switch(m.t){
     case 'welcome':
-      MP.id=m.id; MP.host=m.host; MP.phase=m.phase; MP.mode=m.mode; MP.seed=m.seed; MP.score=m.score; MP.left=m.left; MP.pwSet=m.pwSet; MP.spec=m.spec; fillPlayers(m.ents);
+      MP.id=m.id; MP.host=m.host; MP.phase=m.phase; MP.mode=m.mode; MP.dom=!!m.dom; MP.seed=m.seed; MP.score=m.score; MP.left=m.left; MP.pwSet=m.pwSet; MP.spec=m.spec; fillPlayers(m.ents);
       if(m.phase==='play'&&!m.spec&&m.mode==='tdm')startMP(); else showLobby();
       break;
-    case 'lobby': if(MP.play)break; MP.mode=m.mode; MP.host=m.host; MP.phase=m.phase; fillPlayers(m.ents); renderLobby(); break;
+    case 'lobby': if(MP.play)break; MP.mode=m.mode; MP.dom=!!m.dom; MP.host=m.host; MP.phase=m.phase; fillPlayers(m.ents); renderLobby(); break;
     case 'join': MP.players[m.p.id]=Object.assign({},m.p); if(MP.play){ addRemote(MP.players[m.p.id]); toast(m.p.name+' katıldı'); } break;
     case 'botgone': removeRemote(m.id); if(!MP.play)renderLobby(); break;
     case 'leave': { const pl=MP.players[m.id]; if(pl&&MP.play)toast(pl.name+' ayrıldı'); removeRemote(m.id); const was=MP.host===MP.id; MP.host=m.host; if(MP.play&&!was&&MP.host===MP.id)becomeHost(); if(!MP.play)renderLobby(); break; }
@@ -2799,7 +2806,7 @@ function mpMsg(m){
     case 'vote': showVote(m); break;
     case 'ballots': if(MP.vote&&MP.vote.done&&MP.host!==MP.id)break; if(MP.vote&&MP.host===MP.id)$('vCount').textContent='Kabul: '+m.acc+'  ·  Ret: '+m.rej; break;
     case 'voteend': hideVote(); if(!m.ok){ if(!MP.play){ $('lbWait').textContent=(m.msg||'Teklif kabul edilmedi.')+(m.rej?' (Ret: '+m.rej+', Kabul: '+m.acc+')':''); toast(m.msg||'Teklif kabul edilmedi.',3000); } } break;
-    case 'start': MP.phase='play'; MP.mode=m.mode; MP.seed=m.seed; MP.score=m.score; MP.left=m.left; fillPlayers(m.ents); MP.spec=false; startMP(); break;
+    case 'start': MP.phase='play'; MP.mode=m.mode; MP.dom=!!m.dom; MP.seed=m.seed; MP.score=m.score; MP.left=m.left; fillPlayers(m.ents); MP.spec=false; startMP(); break;
     case 'st': { if(!MP.play)break; const pl=MP.players[m.id]; if(!pl||!pl.f)break; const f=pl.f; f.tx=m.x; f.ty=m.y; f.tz=m.z; f.tyaw=m.yaw; f.spd=m.s; f.air=!!(m.a||m.iv); f.iv=!!m.iv; if(f.fresh){ f.x=m.x; f.y=m.y; f.z=m.z; f.yaw=m.yaw; f.fresh=false; } setRemoteWeapon(f,m.w); break; }
     case 'bs': { if(!MP.play||MP.host===MP.id)break; for(const q of m.b){ const pl=MP.players[q[0]]; if(!pl||!pl.f||!pl.f.remote)continue; const f=pl.f; f.tx=q[1]; f.ty=q[2]; f.tz=q[3]; f.tyaw=q[4]; f.spd=q[5]; f.air=!!q[6]; if(f.fresh){ f.x=q[1]; f.y=q[2]; f.z=q[3]; f.yaw=q[4]; f.fresh=false; } setRemoteWeapon(f,q[7]); } break; }
     case 'sh': { const f=pf(m.id); if(!MP.play||!f||f===P)break; tracer(m.ax,m.ay,m.az,m.bx,m.by,m.bz); if(m.bm)boomFx(m.bx,m.by,m.bz); f.flash.visible=true; f.flashT=0.05; f.firedT=1.2; const w=WBYID[m.w]||WBYID.alfa7; sndShot(0.28/(1+Math.hypot(f.x-P.x,f.z-P.z)/7),w.pitch); break; }
@@ -2807,6 +2814,8 @@ function mpMsg(m){
     case 'nade': { const f=pf(m.id); if(MP.play&&f&&f!==P)spawnProj(m.k,f,m.x,m.y,m.z,m.vx,m.vy,m.vz); break; }
     case 'hp': if(MP.play&&P){ if(m.hp<P.hp-0.5){ hurtT=0.7; } P.hp=m.hp; if(m.ar!=null)P.armor=m.ar; } break;
     case 'time': timeLeft=m.left; break;
+    case 'dsc': if(MP.play&&mode==='tdm'){ score.a=m.score.a; score.o=m.score.o; updateScoreHud(); } break;
+    case 'dfl': if(MP.play&&DOM.on&&MP.host!==MP.id){ m.fl.forEach((q,i)=>{ const fl=DOM.flags[i]; if(fl){ fl.prog=q[0]; fl.own=q[1]; } }); } break;
     case 'kill': {
       if(!MP.play)break; const k=m.k?pf(m.k):null, v=pf(m.v); if(!v)break;
       v.alive=false; v.deaths++; if(k&&k!==v)k.kills++; if(MP.players[m.v])MP.players[m.v].deaths=v.deaths; if(k&&MP.players[m.k])MP.players[m.k].kills=k.kills;
@@ -2903,7 +2912,7 @@ $('lobby').addEventListener('click',e=>{ const b=e.target.closest('button[data-a
   else if(a==='rm')mpSend({t:'rmbot',id}); else if(a==='ab')mpSend({t:'addbot',team:b.dataset.team});
   else if(a==='fill')mpSend({t:'fillbots'}); else if(a==='clr')mpSend({t:'clearbots'});
 });
-document.querySelectorAll('#lbMode button').forEach(b=>b.addEventListener('click',()=>{ if(MP.host===MP.id)mpSend({t:'mode',mode:b.dataset.m}); }));
+document.querySelectorAll('#lbMode button').forEach(b=>b.addEventListener('click',()=>{ if(MP.host!==MP.id)return; const m=b.dataset.m; mpSend({t:'mode',mode:m==='flag'?'tdm':m}); mpSend({t:'dom',on:m==='flag'?1:0}); }));
 $('vYes').addEventListener('click',()=>sendBallot(true)); $('vNo').addEventListener('click',()=>sendBallot(false));
 $('lbLeave').addEventListener('click',mpLeave);
 $('pLeave').addEventListener('click',e=>{ e.stopPropagation(); mpLeave(); });
@@ -2915,7 +2924,7 @@ function frame(t){
   const dt=Math.min(0.05,(t-last)/1000); last=t; now+=dt;
   if(state==='play'&&(!paused||MP.play)&&P){
     timeLeft-=dt; if(timeLeft<=0){ timeLeft=0; if(!MP.play)endMatch(); }
-    if(abilCd>0)abilCd-=dt; if(DOM.on&&mode==='tdm'&&!MP.play&&state==='play')domUpdate(dt);
+    if(abilCd>0)abilCd-=dt; if(DOM.on&&mode==='tdm'&&state==='play')domUpdate(dt);
     updatePlayer(dt);
     for(const f of fighters) if(!f.isPlayer){ if(f.remote)updateRemote(f,dt); else updateBot(f,dt); }
     if(MP.play){

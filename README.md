@@ -99,4 +99,4 @@ yalnızca DoS'u kesiyor, hileyi kesmiyor.
 ### Sınıflar, yıkım ve bayrak modu
 - 5 sınıf (menüden seçilir, **Q** tuşu / mobilde YETENEK): Asalt (zırh plakası), Sağlıkçı (yakındaki takıma +45 can), Destek (cephane ikmali), Nişancı (düşman keşfi), Mühendis (2 C4, +2 bomba). Sağlık/zırh/ikmal çok oyunculuda sunucu üzerinden (`heal`, `gad`) çalışır.
 - Yıkılabilir siper: bomba sandık ve alçak siperleri, C4 konteyner ve tankları da yıkar (yalnızca takım savaşı haritaları).
-- Bayrak ele geçirme (A-B-C): yalnızca tek oyunculuda; 100 puana ilk ulaşan kazanır, botlar bayrak hedefler.
+- Bayrak ele geçirme (A-B-C): tek oyunculu ve çok oyunculu (lobide "Bayrak"). Kurucu bayrak durumunu hesaplayıp yayınlar (`dfl`), sunucu puanı tutar (`dscore`/`dsc`); 100 puana ilk ulaşan kazanır, botlar bayrak hedefler.
