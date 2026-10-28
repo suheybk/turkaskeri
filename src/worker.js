@@ -253,7 +253,7 @@ export class Room {
   clearNv() { if (this.nv) { clearTimeout(this.nv.timer); this.nv = null; } }
   beginNv() {
     if (this.phase !== 'end' || !this.players.size) return;
-    const pool = [['tdm', 0], ['tdm', 1], ['tdm', 2], ['tdm', 3], ['br', 0], ['dm', 0]].sort(() => Math.random() - 0.5), opts = [];
+    const pool = [['tdm', 0], ['tdm', 1], ['tdm', 2], ['tdm', 3], ['tdm', 4], ['br', 0], ['dm', 0]].sort(() => Math.random() - 0.5), opts = [];
     for (const [mode, dom] of pool) { if (opts.length >= 3) break; opts.push({ mode, dom, seed: (Math.random() * 2147483647) | 0 }); }
     this.clearNv(); this.nv = { opts, votes: new Map(), timer: setTimeout(() => this.endNv(), 13000) };
     this.bcast({ t: 'nvote', ms: 13000, opts });
@@ -264,7 +264,7 @@ export class Room {
     const cnt = nv.opts.map(() => 0); for (const v of nv.votes.values()) cnt[v]++;
     const mx = Math.max(...cnt), best = cnt.map((c, i) => (c === mx ? i : -1)).filter((i) => i >= 0), o = nv.opts[best[Math.floor(Math.random() * best.length)]];
     this.mode = o.mode; this.dom = o.mode === 'tdm' ? o.dom : 0; this.nextSeed = o.seed; this.normalize();
-    if (this.bots.size || this.dom === 2 || this.mode !== 'tdm') this.fillBots();
+    if (this.bots.size || this.dom === 2 || this.dom === 4 || this.mode !== 'tdm') this.fillBots();
     this.sendLobby(); this.bcast({ t: 'nvend', mode: this.mode, dom: this.dom });
     setTimeout(() => { if (this.phase === 'end' && this.players.size) this.startMatch(); }, 3000);
   }
@@ -287,7 +287,7 @@ export class Room {
     else { this.bcast({ t: 'voteend', ok: true, rej, acc }); this.startMatch(); }
   }
   startMatch() {
-    this.phase = 'play'; const cq = this.mode === 'tdm' && this.dom === 2; this.score = cq ? { a: CQ_T, o: CQ_T } : { a: 0, o: 0 }; this.left = this.mode === 'dm' ? MATCH_DM : cq ? 600 : MATCH; this.seed = this.nextSeed != null ? this.nextSeed : (Math.random() * 2147483647) | 0; this.nextSeed = null;
+    this.phase = 'play'; const cq = this.mode === 'tdm' && this.dom === 2; const ru = this.mode === 'tdm' && this.dom === 4; this.score = cq ? { a: CQ_T, o: CQ_T } : ru ? { a: 0, o: 1 } : { a: 0, o: 0 }; this.left = this.mode === 'dm' ? MATCH_DM : cq || ru ? 600 : MATCH; this.seed = this.nextSeed != null ? this.nextSeed : (Math.random() * 2147483647) | 0; this.nextSeed = null;
     this.picked.clear(); this.veh.clear(); this.veh2.clear();
     for (const e of this.all()) { e.kills = 0; e.deaths = 0; e.alive = true; e.spec = false; e.hp = this.hpFor(e); e.lastHit = 0; e.place = 0; e.armor = 0; }
     this.alive = this.all().length;
@@ -348,7 +348,7 @@ export class Room {
       /* kurucu ayarları */
       case 'mode': if (isHost && lobbyOK && (m.mode === 'tdm' || m.mode === 'br' || m.mode === 'dm')) { this.clearNv(); this.mode = m.mode; if (this.mode !== 'tdm') this.dom = 0; this.normalize(); this.sendLobby(); } break;
       case 'nv': if (this.nv && this.phase === 'end') { const i = num(m.i) | 0; if (i >= 0 && i < this.nv.opts.length) { this.nv.votes.set(p.id, i); const c = this.nv.opts.map(() => 0); for (const v of this.nv.votes.values()) c[v]++; this.bcast({ t: 'nvc', c }); } } break;
-      case 'dom': if (isHost && lobbyOK && this.mode === 'tdm') { this.clearNv(); this.dom = Math.max(0, Math.min(3, num(m.on) | 0)); this.normalize(); this.sendLobby(); } break;
+      case 'dom': if (isHost && lobbyOK && this.mode === 'tdm') { this.clearNv(); this.dom = Math.max(0, Math.min(4, num(m.on) | 0)); this.normalize(); this.sendLobby(); } break;
       case 'addbot': if (isHost && lobbyOK) { this.addBot(m.team === 'o' ? 'o' : 'a'); this.sendLobby(); } break;
       case 'fillbots': if (isHost && lobbyOK) { this.fillBots(); this.sendLobby(); } break;
       case 'clearbots': if (isHost && lobbyOK) { this.bots.clear(); this.sendLobby(); } break;
@@ -371,7 +371,7 @@ export class Room {
         break;
       }
       case 'dscore': {
-        if (!isHost || this.phase !== 'play' || this.mode !== 'tdm' || !this.dom) return;
+        if (!isHost || this.phase !== 'play' || this.mode !== 'tdm' || !this.dom || this.dom === 4) return;
         const now = Date.now(); if (now - this.dsT < 1500) return; this.dsT = now;
         const da = Math.min(8, Math.max(0, num(m.a) | 0)), dob = Math.min(8, Math.max(0, num(m.o) | 0));
         if (this.dom === 2) { this.score.a = Math.max(0, this.score.a - da); this.score.o = Math.max(0, this.score.o - dob); }
@@ -382,6 +382,9 @@ export class Room {
         break;
       }
       case 'cfl': if (isHost && this.phase === 'play' && this.dom === 3 && Array.isArray(m.f)) this.bcast({ t: 'cfl', f: m.f.slice(0, 2).map((q) => [num(q[0]), num(q[1]), num(q[2], -1) | 0]) }, p); break;
+      case 'rarm': if (this.phase === 'play' && this.dom === 4 && p.alive) this.bcast({ t: 'rarm', id: p.id, on: m.on ? 1 : 0, i: num(m.i, -1) | 0 }, p); break;
+      case 'rst': if (isHost && this.phase === 'play' && this.dom === 4 && Array.isArray(m.ob)) this.bcast({ t: 'rst', tk: num(m.tk), st: num(m.st) | 0, ob: m.ob.slice(0, 4).map((q) => [num(q[0]) | 0, num(q[1]), num(q[2]), num(q[3])]) }, p); break;
+      case 'fin': if (isHost && this.phase === 'play' && this.dom === 4) { this.score = m.w === 'a' ? { a: 2, o: 1 } : { a: 0, o: 1 }; this.bcast({ t: 'dsc', score: this.score }); this.endMatch(); } break;
       case 'dfl': if (isHost && this.phase === 'play' && this.dom && Array.isArray(m.fl)) this.bcast({ t: 'dfl', fl: m.fl.slice(0, 8).map((q) => [num(q[0]), q[1] === 'a' ? 'a' : q[1] === 'o' ? 'o' : '']) }, p); break;
       case 'bs': if (isHost && this.phase === 'play' && Array.isArray(m.b)) this.bcast({ t: 'bs', b: m.b.slice(0, 70) }, p); break;
       case 'sh': {
@@ -467,7 +470,7 @@ export class Room {
   }
   /* ---- bot yönetimi ---- */
   botName() { const used = new Set(this.all().map((e) => e.name)); const free = BOTNAMES.filter((n) => !used.has(n)); return free.length ? free[Math.floor(Math.random() * free.length)] : 'Bot' + this.nextBot; }
-  per() { return this.mode === 'tdm' && this.dom === 2 ? 32 : PERTEAM; }
+  per() { return this.mode === 'tdm' ? (this.dom === 2 ? 32 : this.dom === 4 ? 12 : PERTEAM) : PERTEAM; }
   limit() { return this.mode === 'br' ? BRMAX : this.per() * 2; }
   addBot(team) {
     const total = this.all().filter((e) => !e.spec).length;

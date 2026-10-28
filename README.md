@@ -125,3 +125,8 @@ yalnızca DoS'u kesiyor, hileyi kesmiyor.
 - Tek oyunculu menüde "Bayrak kapma (CTF)", çok oyunculuda lobide "Bayrak kapma" (dom=3). İlk 5 yakalamaya ulaşan kazanır.
 - Düşmanın bayrağına dokun → taşı → kendi bayrağın üstteyken kendi üssüne getir. Taşıyan ölürse bayrak düşer; takım arkadaşı dokunursa üsse döner, 25 sn dokunulmazsa kendiliğinden döner.
 - Çok oyunculu: bayrak durumunu host hesaplar (`cfl` yayını), skor `dscore` ile sunucuya gider.
+
+## Rush (M-COM)
+- Lobi/menüde "Rush": Alfa saldırır (80 bilet), Özel Harekât savunur. Büyük harita, 2 aşama × 2 M-COM.
+- M-COM'un 3.5 m yakınında E'yi basılı tut: saldırgan 5 sn'de kurar, 30 sn fitil yanar; savunma 4 sn basılı tutarak etkisizleştirir. Aşamadaki tüm M-COM'lar imha olursa sonraki aşama; son aşama biterse Alfa kazanır. Bilet biterse veya süre dolarsa savunma kazanır.
+- Çok oyunculu: host durumu hesaplar (`rst`), oyuncular tutma bilgisini `rarm` ile yollar, bitiş `fin`.
