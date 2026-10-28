@@ -1349,7 +1349,7 @@ function updateBot(b,dt){
   if(b.air){ updateAirBot(b,dt); return; }
   if(b.veh){ botVehUpdate(b,dt); return; }
   if(b.crewOf){ botCrewUpdate(b,dt); return; }
-  if(b.wantV){ const v=b.wantV; b.wantT=(b.wantT||0)-dt; const crewOK=v.type==='heli'&&v.bot&&(v.crew||0)<2&&v.y<1.5; if(v.pass||b.wantT<=0||(!crewOK&&(v.occupied||v.bot)))b.wantV=null; else if(Math.hypot(v.x-b.x,v.z-b.z)<(VRANGE[v.type]||4)){ if(crewOK)botCrewIn(b,v); else botEnter(b,v); return; } }
+  if(b.wantV){ const v=b.wantV; b.wantT=(b.wantT||0)-dt; const crewOK=v.type==='heli'&&v.bot&&(v.crew||0)<2&&v.y<1.5; if(v.pass||b.wantT<=0||(!crewOK&&(v.occupied||v.bot)))b.wantV=null; else if(Math.hypot(v.x-b.x,v.z-b.z)<((VRANGE[v.type]||4)+2.2)){ if(crewOK)botCrewIn(b,v); else botEnter(b,v); return; } }
   b.firedT=Math.max(0,b.firedT-dt); b.cd-=dt; b.reactT-=dt; b.strafeT-=dt; b.scanT-=dt;
   if(b.flashT>0){ b.flashT-=dt; if(b.flashT<=0)b.flash.visible=false; }
   if(b.scanT<=0){ b.scanT=0.18+Math.random()*0.1; botScan(b); }
@@ -1825,7 +1825,7 @@ function ruUpdate(dt){
 /* ---------- Botlar araç kullanır ---------- */
 function botVehFind(b){
   let best=null,bd=34; for(const v of BR.vehicles){ if(v.type==='plane'||v.pass)continue;
-    const crew=v.type==='heli'&&v.bot&&(v.crew||0)<2&&v.y<1.5&&v.bot.vt<5;
+    const crew=v.type==='heli'&&v.bot&&(v.crew||0)<2&&v.y<1.5&&v.bot.vt<(v.crewWant?19:5);
     if(!crew&&(v.occupied||v.bot||(v.type==='heli'&&v.y>1)))continue;
     const d=Math.hypot(v.x-b.x,v.z-b.z)-(v.type==='heli'?14:0); if(d<bd){bd=d;best=v;} } return best;
 }
@@ -1841,6 +1841,14 @@ function botCrewUpdate(b,dt){
     if(tg){ b.vcd=0.35; const hit=Math.random()<0.3, tx=tg.x+(hit?0:rnd(-2,2)), tz=tg.z+(hit?0:rnd(-2,2)), ty=tg.y+1.2;
       tracer(v.x+1,v.y+1.5,v.z,tx,ty,tz); if(MP.play&&b.bot)mpSend({t:'sh',bot:b.id,ax:+v.x.toFixed(2),ay:+(v.y+1.5).toFixed(2),az:+v.z.toFixed(2),bx:+tx.toFixed(2),by:+ty.toFixed(2),bz:+tz.toFixed(2),w:'alfa7'});
       if(hit)damage(tg,14,b,false); sndShot(0.15/(1+Math.hypot(v.x-P.x,v.z-P.z)/8),700); } else b.vcd=0.4; }
+}
+function ruCrewAssign(){
+  if(!RU.on||(MP.play&&MP.host!==MP.id))return;
+  for(const v of BR.vehicles){ if(v.type!=='heli'||v.occupied)continue;
+    const tm=v.home.z>0?'a':'o', c=fighters.filter(f=>!f.isPlayer&&!f.remote&&f.alive&&f.team===tm&&!f.veh&&!f.crewOf).sort((p,q)=>Math.hypot(p.x-v.x,p.z-v.z)-Math.hypot(q.x-v.x,q.z-v.z)).slice(0,3);
+    v.crewWant=Math.max(0,c.length-1);
+    c.forEach((f,i)=>{ f.wantV=v; f.wantT=60; f.path=null; f.pathAt=0; const nx=v.x+4.5+i*1.4, nz=v.z+3.5; if(!blockedAt(nx,nz,0.5,0)){ f.x=nx; f.z=nz; } });
+  }
 }
 function botEnter(b,v){
   v.occupied=true; v.bot=b; b.veh=v; b.vt=0; b.wantV=null; b.vgoal=null; b.vgoalT=0; b.vrev=0; b.vcd=1; b.vx0=v.x; b.vz0=v.z; b.vsT=0;
@@ -1864,11 +1872,11 @@ function botVehUpdate(b,dt){
   const gx=b.vgoal[0], gz=b.vgoal[1], want=Math.atan2(-(gx-v.x),-(gz-v.z)), dy=wrapA(want-v.yaw);
   const heli=ty==='heli';
   if(heli){
-    const landing=b.vt>50, ty_=(landing||b.vt<6)?0:14;
+    const landing=b.vt>50, hold=b.vt<((v.crewWant&&(v.crew||0)<v.crewWant)?20:6), ty_=(landing||hold)?0:14;
     v.rotor=Math.min(1,v.rotor+dt*0.5);
     v.y+=clamp(ty_-v.y,-5,4)*Math.min(1,dt*1.5); if(v.y<0)v.y=0;
     v.yaw+=clamp(dy,-0.9,0.9)*dt*1.3;
-    const sp=(v.y>9&&!landing&&b.vt>=6)?(Math.abs(dy)<0.7?22:6):0; v.speed+=(sp-v.speed)*Math.min(1,dt*0.8);
+    const sp=(v.y>9&&!landing&&!hold)?(Math.abs(dy)<0.7?22:6):0; v.speed+=(sp-v.speed)*Math.min(1,dt*0.8);
     const HB=mode==='br'?BR.half:MH; v.x=clamp(v.x-Math.sin(v.yaw)*v.speed*dt,-HB+3,HB-3); v.z=clamp(v.z-Math.cos(v.yaw)*v.speed*dt,-HB+3,HB-3);
     v.pitchV=-(v.speed/30)*0.22; v.roll=0;
     if(landing&&v.y<0.6){ botExit(b,false); return; }
@@ -2803,6 +2811,7 @@ function startGame(teamKey){
   if(RU.on){ ruInit(); updateScoreHud(); } else if(CTF.on)ctfInit(); else if(DOM.on)domInit();
   assignSquads();
   for(const f of fighters) respawn(f);
+  if(RU.on)ruCrewAssign();
   $('feed').innerHTML=''; $('dead').style.display='none'; $('hint').style.display='none';
   updateScoreHud(); $('prompt').style.display='none'; $('vinfo').style.display='none'; $('goal').textContent='İlk 30 öldürmeye ulaşan kazanır   |   Harita: '+TM.name; state='play'; paused=false; fallback=false; document.body.classList.remove('nolock'); P.pitch=0;
   document.body.classList.add('playing'); $('menu').classList.remove('on'); $('end').classList.remove('on'); $('pause').classList.remove('on');
@@ -3156,6 +3165,7 @@ function startMP(){ MP.nv=null; $('nvote').classList.remove('on');
     updateScoreHud(); $('goal').textContent=DOM.on?(CQ.on?'Büyük savaş':CTF.on?'Bayrak kapma':RU.on?'Rush':'Bayrak ele geçirme'):'İlk 30 öldürmeye ulaşan kazanır   |   Harita: '+TM.name;
   }
   $('feed').innerHTML=''; $('dead').style.display='none'; $('hint').style.display='none'; $('prompt').style.display='none'; $('vinfo').style.display='none';
+  if(RU.on&&MP.host===MP.id)setTimeout(()=>{ if(MP.play&&RU.on)ruCrewAssign(); },1500);
   MP.play=true; MP.wasPlaying=true; MP.sendT=0; state='play'; paused=false; fallback=false; document.body.classList.remove('nolock'); if(!br&&!dm)P.pitch=0;
   document.body.classList.add('playing'); for(const id of ['entry','lobby','menu','end','pause'])$(id).classList.remove('on');
   $('pLeave').style.display='inline-block'; lockPointer();
