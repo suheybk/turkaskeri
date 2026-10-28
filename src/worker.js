@@ -148,7 +148,7 @@ export class Accounts {
 /* ------------------------------------------------------------------ */
 /* Oda: takım savaşı (TDM) ya da Battle Royale, insan + bot                */
 /* ------------------------------------------------------------------ */
-const DOM_T = 100, TARGET = 30, TARGET_DM = 40, MATCH = 360, MATCH_DM = 600, MAXH = 8, PERTEAM = 4, BRMAX = 16;
+const CQ_T = 500, DOM_T = 100, TARGET = 30, TARGET_DM = 40, MATCH = 360, MATCH_DM = 600, MAXH = 8, PERTEAM = 4, BRMAX = 16;
 const BOTNAMES = ['Kaan', 'Yağız', 'Tolga', 'Efe', 'Bora', 'Tuna', 'Arda', 'Demir', 'Ozan', 'Berk', 'Mert', 'Ilgaz', 'Barış', 'Cem', 'Alper', 'Umut', 'Kerem', 'Onur', 'Selim', 'Emre', 'Deniz', 'Rüzgar'];
 const num = (v, d = 0) => (Number.isFinite(+v) ? +v : d);
 const sid = (v) => String(v == null ? '' : v).slice(0, 24);
@@ -157,7 +157,7 @@ export class Room {
   constructor() {
     this.inited = false; this.pw = ''; this.players = new Map(); this.bots = new Map();
     this.nextId = 1; this.nextBot = 101; this.mode = 'tdm'; this.phase = 'lobby';
-    this.score = { a: 0, o: 0 }; this.dom = false; this.dsT = 0; this.left = MATCH; this.host = null; this.timer = null; this.tick = 0;
+    this.score = { a: 0, o: 0 }; this.dom = 0; this.dsT = 0; this.left = MATCH; this.host = null; this.timer = null; this.tick = 0;
     this.pwFail = { n: 0, until: 0 };
     this.vote = null; this.picked = new Set(); this.veh = new Map(); this.veh2 = new Map(); this.alive = 0; this.seed = 1;
   }
@@ -168,7 +168,7 @@ export class Room {
   teamCount(t) { let c = 0; for (const e of this.all()) if (e.team === t && !e.spec) c++; return c; }
   send(p, o) { try { p.ws.send(JSON.stringify(o)); } catch (e) { } }
   bcast(o, except) { const s = JSON.stringify(o); for (const p of this.players.values()) if (p !== except) { try { p.ws.send(s); } catch (e) { } } }
-  sendLobby() { this.bcast({ t: 'lobby', mode: this.mode, dom: this.mode === 'tdm' && this.dom, host: this.host, phase: this.phase, ents: this.all().filter((e) => !e.spec).map((e) => this.pub(e)) }); }
+  sendLobby() { this.bcast({ t: 'lobby', mode: this.mode, dom: this.mode === 'tdm' ? this.dom : 0, host: this.host, phase: this.phase, ents: this.all().filter((e) => !e.spec).map((e) => this.pub(e)) }); }
 
   async fetch(req) {
     const u = new URL(req.url);
@@ -211,15 +211,15 @@ export class Room {
     // takım / yer aç
     if (this.mode === 'tdm') {
       let t = this.teamCount('a') <= this.teamCount('o') ? 'a' : 'o';
-      if (this.teamCount(t) >= PERTEAM) t = t === 'a' ? 'o' : 'a';
-      if (this.teamCount(t) >= PERTEAM) { const b = [...this.bots.values()].pop(); if (b) { this.bots.delete(b.id); t = b.team; this.bcast({ t: 'botgone', id: b.id }); } }
+      if (this.teamCount(t) >= this.per()) t = t === 'a' ? 'o' : 'a';
+      if (this.teamCount(t) >= this.per()) { const b = [...this.bots.values()].pop(); if (b) { this.bots.delete(b.id); t = b.team; this.bcast({ t: 'botgone', id: b.id }); } }
       p.team = t;
     } else if (this.all().filter((e) => !e.spec).length >= BRMAX) { const b = [...this.bots.values()].pop(); if (b) { this.bots.delete(b.id); this.bcast({ t: 'botgone', id: b.id }); } }
     if (this.phase === 'play' && this.mode === 'br') { p.spec = true; p.alive = false; }
     p.hp = this.hpFor(p);
     this.players.set(p.id, p);
     if (!this.host || !this.players.has(this.host)) this.host = p.id;
-    this.send(p, { t: 'welcome', id: p.id, host: this.host, phase: this.phase, mode: this.mode, dom: this.mode === 'tdm' && this.dom, seed: this.seed, score: this.score, left: this.left, pwSet: !!this.pw, ents: this.all().filter((e) => !e.spec).map((e) => this.pub(e)), spec: p.spec });
+    this.send(p, { t: 'welcome', id: p.id, host: this.host, phase: this.phase, mode: this.mode, dom: this.mode === 'tdm' ? this.dom : 0, seed: this.seed, score: this.score, left: this.left, pwSet: !!this.pw, ents: this.all().filter((e) => !e.spec).map((e) => this.pub(e)), spec: p.spec });
     if (this.phase === 'play') this.bcast({ t: 'join', p: this.pub(p) }, p); else this.sendLobby();
     ws.addEventListener('message', (ev) => this.onMsg(p, ev.data));
     const gone = () => this.removePlayer(p);
@@ -256,7 +256,7 @@ export class Room {
     if (this.players.size <= 1) return this.startMatch();
     const humans = this.players.size;
     this.vote = { acc: new Set([p.id]), rej: new Set(), voted: new Set([p.id]), timer: setTimeout(() => this.endVote(), 5000) };
-    this.bcast({ t: 'vote', ms: 5000, mode: this.mode, dom: this.mode === 'tdm' && this.dom, host: p.name, humans, bots: this.bots.size });
+    this.bcast({ t: 'vote', ms: 5000, mode: this.mode, dom: this.mode === 'tdm' ? this.dom : 0, host: p.name, humans, bots: this.bots.size });
   }
   maybeFinishVote() { if (this.vote && this.vote.voted.size >= this.players.size) this.endVote(); }
   cancelVote(msg) { if (!this.vote) return; clearTimeout(this.vote.timer); this.vote = null; this.bcast({ t: 'voteend', ok: false, rej: 0, acc: 0, msg }); }
@@ -267,11 +267,11 @@ export class Room {
     else { this.bcast({ t: 'voteend', ok: true, rej, acc }); this.startMatch(); }
   }
   startMatch() {
-    this.phase = 'play'; this.score = { a: 0, o: 0 }; this.left = this.mode === 'dm' ? MATCH_DM : MATCH; this.seed = (Math.random() * 2147483647) | 0;
+    this.phase = 'play'; const cq = this.mode === 'tdm' && this.dom === 2; this.score = cq ? { a: CQ_T, o: CQ_T } : { a: 0, o: 0 }; this.left = this.mode === 'dm' ? MATCH_DM : cq ? 600 : MATCH; this.seed = (Math.random() * 2147483647) | 0;
     this.picked.clear(); this.veh.clear(); this.veh2.clear();
     for (const e of this.all()) { e.kills = 0; e.deaths = 0; e.alive = true; e.spec = false; e.hp = this.hpFor(e); e.lastHit = 0; e.place = 0; e.armor = 0; }
     this.alive = this.all().length;
-    this.bcast({ t: 'start', mode: this.mode, dom: this.mode === 'tdm' && this.dom, seed: this.seed, left: this.left, score: this.score, ents: this.all().map((e) => this.pub(e)) });
+    this.bcast({ t: 'start', mode: this.mode, dom: this.mode === 'tdm' ? this.dom : 0, seed: this.seed, left: this.left, score: this.score, ents: this.all().map((e) => this.pub(e)) });
     this.stopTimer(); this.tick = 0; this.timer = setInterval(() => this.onTick(), 1000);
   }
   onTick() {
@@ -302,13 +302,14 @@ export class Room {
     v.alive = false; v.deaths++;
     const self = a === v;
     if (a && !self) { a.kills++; if (this.mode === 'tdm' && !this.dom) this.score[a.team]++; }
+    if (this.mode === 'tdm' && this.dom === 2) this.score[v.team] = Math.max(0, this.score[v.team] - 1);
     let place = 0;
     if (this.mode === 'br') { place = this.alive; this.alive--; v.place = place; }
     if (!v.bot) this.freeVeh(v.id);
     this.bcast({ t: 'kill', k: a ? a.id : 0, v: v.id, head: head ? 1 : 0, score: this.score, why: why || '', place });
     if (this.mode !== 'br') {
       setTimeout(() => { if (this.phase === 'play' && this.ent(v.id)) { v.alive = true; v.hp = this.hpFor(v); this.bcast({ t: 'resp', id: v.id, hp: v.hp }); } }, 3000);
-      if (this.mode === 'tdm' ? (!this.dom && (this.score.a >= TARGET || this.score.o >= TARGET)) : (a && a.kills >= TARGET_DM)) this.endMatch();
+      if (this.mode === 'tdm' ? (this.dom === 2 ? (this.score.a <= 0 || this.score.o <= 0) : (!this.dom && (this.score.a >= TARGET || this.score.o >= TARGET))) : (a && a.kills >= TARGET_DM)) this.endMatch();
     } else if (this.alive <= 1) this.endMatch();
   }
 
@@ -324,15 +325,15 @@ export class Room {
     const lobbyOK = this.phase !== 'play' && !this.vote;
     switch (m.t) {
       /* kurucu ayarları */
-      case 'mode': if (isHost && lobbyOK && (m.mode === 'tdm' || m.mode === 'br' || m.mode === 'dm')) { this.mode = m.mode; if (this.mode !== 'tdm') this.dom = false; this.normalize(); this.sendLobby(); } break;
-      case 'dom': if (isHost && lobbyOK && this.mode === 'tdm') { this.dom = !!m.on; this.sendLobby(); } break;
+      case 'mode': if (isHost && lobbyOK && (m.mode === 'tdm' || m.mode === 'br' || m.mode === 'dm')) { this.mode = m.mode; if (this.mode !== 'tdm') this.dom = 0; this.normalize(); this.sendLobby(); } break;
+      case 'dom': if (isHost && lobbyOK && this.mode === 'tdm') { this.dom = Math.max(0, Math.min(2, num(m.on) | 0)); this.normalize(); this.sendLobby(); } break;
       case 'addbot': if (isHost && lobbyOK) { this.addBot(m.team === 'o' ? 'o' : 'a'); this.sendLobby(); } break;
       case 'fillbots': if (isHost && lobbyOK) { this.fillBots(); this.sendLobby(); } break;
       case 'clearbots': if (isHost && lobbyOK) { this.bots.clear(); this.sendLobby(); } break;
       case 'rmbot': if (isHost && lobbyOK) { this.bots.delete(num(m.id)); this.sendLobby(); } break;
       case 'setteam': if (isHost && lobbyOK && this.mode === 'tdm') {
         const e = this.ent(num(m.id)); const t = m.team === 'o' ? 'o' : 'a';
-        if (e && e.team !== t) { if (this.teamCount(t) >= PERTEAM) return this.send(p, { t: 'err', msg: 'O takım dolu.' }); e.team = t; this.sendLobby(); }
+        if (e && e.team !== t) { if (this.teamCount(t) >= this.per()) return this.send(p, { t: 'err', msg: 'O takım dolu.' }); e.team = t; this.sendLobby(); }
       } break;
       case 'start': if (isHost && lobbyOK) this.startVote(p); break;
       case 'ballot': {
@@ -350,13 +351,15 @@ export class Room {
       case 'dscore': {
         if (!isHost || this.phase !== 'play' || this.mode !== 'tdm' || !this.dom) return;
         const now = Date.now(); if (now - this.dsT < 1500) return; this.dsT = now;
-        this.score.a += Math.min(3, Math.max(0, num(m.a) | 0)); this.score.o += Math.min(3, Math.max(0, num(m.o) | 0));
+        const da = Math.min(8, Math.max(0, num(m.a) | 0)), dob = Math.min(8, Math.max(0, num(m.o) | 0));
+        if (this.dom === 2) { this.score.a = Math.max(0, this.score.a - da); this.score.o = Math.max(0, this.score.o - dob); }
+        else { this.score.a += da; this.score.o += dob; }
         this.bcast({ t: 'dsc', score: this.score });
-        if (this.score.a >= DOM_T || this.score.o >= DOM_T) this.endMatch();
+        if (this.dom === 2 ? (this.score.a <= 0 || this.score.o <= 0) : (this.score.a >= DOM_T || this.score.o >= DOM_T)) this.endMatch();
         break;
       }
-      case 'dfl': if (isHost && this.phase === 'play' && this.dom && Array.isArray(m.fl)) this.bcast({ t: 'dfl', fl: m.fl.slice(0, 3).map((q) => [num(q[0]), q[1] === 'a' ? 'a' : q[1] === 'o' ? 'o' : '']) }, p); break;
-      case 'bs': if (isHost && this.phase === 'play' && Array.isArray(m.b)) this.bcast({ t: 'bs', b: m.b.slice(0, 24) }, p); break;
+      case 'dfl': if (isHost && this.phase === 'play' && this.dom && Array.isArray(m.fl)) this.bcast({ t: 'dfl', fl: m.fl.slice(0, 8).map((q) => [num(q[0]), q[1] === 'a' ? 'a' : q[1] === 'o' ? 'o' : '']) }, p); break;
+      case 'bs': if (isHost && this.phase === 'play' && Array.isArray(m.b)) this.bcast({ t: 'bs', b: m.b.slice(0, 70) }, p); break;
       case 'sh': {
         if (this.phase !== 'play') return;
         let id = p.id; if (m.bot != null) { if (!isHost || !this.bots.has(num(m.bot))) return; id = num(m.bot); } else if (!p.alive) return;
@@ -438,22 +441,23 @@ export class Room {
   }
   /* ---- bot yönetimi ---- */
   botName() { const used = new Set(this.all().map((e) => e.name)); const free = BOTNAMES.filter((n) => !used.has(n)); return free.length ? free[Math.floor(Math.random() * free.length)] : 'Bot' + this.nextBot; }
-  limit() { return this.mode === 'br' ? BRMAX : PERTEAM * 2; }
+  per() { return this.mode === 'tdm' && this.dom === 2 ? 32 : PERTEAM; }
+  limit() { return this.mode === 'br' ? BRMAX : this.per() * 2; }
   addBot(team) {
     const total = this.all().filter((e) => !e.spec).length;
-    if (this.mode === 'tdm') { if (this.teamCount(team) >= PERTEAM) team = team === 'a' ? 'o' : 'a'; if (this.teamCount(team) >= PERTEAM) return false; }
+    if (this.mode === 'tdm') { if (this.teamCount(team) >= this.per()) team = team === 'a' ? 'o' : 'a'; if (this.teamCount(team) >= this.per()) return false; }
     else if (total >= BRMAX) return false;
     const b = { id: this.nextBot++, name: this.botName(), team, kills: 0, deaths: 0, alive: true, hp: 100, armor: 0, lastHit: 0, bot: true, spec: false };
     this.bots.set(b.id, b); return true;
   }
   fillBots() {
-    if (this.mode === 'tdm') { while (this.teamCount('a') < PERTEAM) if (!this.addBot('a')) break; while (this.teamCount('o') < PERTEAM) if (!this.addBot('o')) break; }
+    if (this.mode === 'tdm') { while (this.teamCount('a') < this.per()) if (!this.addBot('a')) break; while (this.teamCount('o') < this.per()) if (!this.addBot('o')) break; }
     else { let n = 0; while (this.all().filter((e) => !e.spec).length < BRMAX && n++ < 20) if (!this.addBot(n % 2 ? 'a' : 'o')) break; }
   }
   normalize() { // mod değişince sığmayanları at
     if (this.mode === 'tdm') {
-      for (const t of ['a', 'o']) { while (this.teamCount(t) > PERTEAM) { const b = [...this.bots.values()].reverse().find((x) => x.team === t); if (!b) break; this.bots.delete(b.id); } }
-      for (const p of this.players.values()) if (this.teamCount(p.team) > PERTEAM) p.team = p.team === 'a' ? 'o' : 'a';
+      for (const t of ['a', 'o']) { while (this.teamCount(t) > this.per()) { const b = [...this.bots.values()].reverse().find((x) => x.team === t); if (!b) break; this.bots.delete(b.id); } }
+      for (const p of this.players.values()) if (this.teamCount(p.team) > this.per()) p.team = p.team === 'a' ? 'o' : 'a';
     } else { while (this.all().length > BRMAX) { const b = [...this.bots.values()].pop(); if (!b) break; this.bots.delete(b.id); } }
   }
 }

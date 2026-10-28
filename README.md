@@ -100,3 +100,8 @@ yalnızca DoS'u kesiyor, hileyi kesmiyor.
 - 5 sınıf (menüden seçilir, **Q** tuşu / mobilde YETENEK): Asalt (zırh plakası), Sağlıkçı (yakındaki takıma +45 can), Destek (cephane ikmali), Nişancı (düşman keşfi), Mühendis (2 C4, +2 bomba). Sağlık/zırh/ikmal çok oyunculuda sunucu üzerinden (`heal`, `gad`) çalışır.
 - Yıkılabilir siper: bomba sandık ve alçak siperleri, C4 konteyner ve tankları da yıkar (yalnızca takım savaşı haritaları).
 - Bayrak ele geçirme (A-B-C): tek oyunculu ve çok oyunculu (lobide "Bayrak"). Kurucu bayrak durumunu hesaplayıp yayınlar (`dfl`), sunucu puanı tutar (`dscore`/`dsc`); 100 puana ilk ulaşan kazanır, botlar bayrak hedefler.
+
+### Büyük savaş (Conquest, 32v32)
+- 220 m x 220 m iki harita (Kuşatma, Liman; sabit tohumla üretilir), 7 bayrak, her takım 500 bilet. Ölüm 1 bilet, bayrak çoğunluğu rakibin biletini eritir; biletleri biten kaybeder (süre 10 dk).
+- Solo: 31 + 32 bot. Çok oyunculu: kurucu botları yönetir, sunucu bilet tutar (`dscore`, `dsc`), lobide "Büyük savaş 32v32".
+- Botlar 2 m'lik gezinme ızgarası (A*) ile yürür; ölenler sahip olunan bayraklarda veya üste doğar.
