@@ -154,3 +154,8 @@ yalnızca DoS'u kesiyor, hileyi kesmiyor.
 ## Çömelme ve yatma
 - **C** çömel, **Z** yat (tekrar basınca kalk; Boşluk/Shift de kaldırır). Çömelmişken hız %55, yatarken %25; koşu ve zıplama yok. Kamera alçalır; alçak sipere (1,2 m) çömelince tamamen saklanabilirsin. Botlar çömelen/yatan oyuncuyu daha zor görür ve vurur. Çok oyunculuda diğer oyuncular duruşunu görür (karakter alçalır). Mobilde sağdaki ÇÖMEL / YAT düğmeleri.
 - Helikopter 1,5 kat büyütüldü (~16 m, gerçek UH-60 boyunda): çarpışma kutusu, bineceğin mesafe, kamera, namlu ve botların uçuş irtifası (18 m) buna göre ayarlandı.
+
+## Helikopter içi yürünebilir kabin
+- Black Hawk artık içi boş: gri zemin, zeytin yeşili sedye/ranza ve oturaklar (BR, Rush, Conquest'te aynı model).
+- Helikopterde E ile bin, içeride yürü, kapıdan E ile in; uçuşta da yürünebilir. Bot pilot uçarken kendi silahınla ateş edebilirsin.
+- Sınır: mermiler duvarlardan geçer; çok oyunculu binme/yürüme senkronu gerçek ağda test edilmedi.
