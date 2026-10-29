@@ -1837,7 +1837,7 @@ function ruUpdate(dt){
 const HS=1.5, RIDE_OBS=[[0.62,0.95,-0.2,0.5],[0.62,0.95,1.7,2.6]];
 function rideOK(x,z,v){ if(z<-0.05||z>2.5)return false; const door=z>0.55&&z<1.65, xmax=door?(v.y<1.5?1.4:0.95):0.9; if(x<-0.38||x>xmax)return false; for(const o of RIDE_OBS)if(x>o[0]&&x<o[1]&&z>o[2]&&z<o[3])return false; return true; }
 const RIDE_SEATS=[[0.8,0.15],[0.8,2.15],[-0.72,0.55],[-0.72,1.85]];
-function rideSeat(){ let b=null,bd=0.9; for(const q of RIDE_SEATS){ const d=Math.hypot(P.rl.x-q[0],P.rl.z-q[1]); if(d<bd){bd=d;b=q;} } return b; }
+function rideSeat(){ let b=null,bd=0.9; for(const q of RIDE_SEATS){ if(P.ride&&fighters.some(f=>f.crewOf===P.ride&&f.cslot!==undefined&&Math.abs((f.cslot?2.15:0.15)-q[1])<0.1&&q[0]>0))continue; const d=Math.hypot(P.rl.x-q[0],P.rl.z-q[1]); if(d<bd){bd=d;b=q;} } return b; }
 function rideWorld(v){ const c=Math.cos(v.yaw),sn=Math.sin(v.yaw),l=P.rl; return [v.x+(l.x*c+l.z*sn)*HS, v.y+(0.85-(P.sit?0.3:0))*HS, v.z+(-l.x*sn+l.z*c)*HS]; }
 function rideEnter(v){
   P.ride=v; P.sit=null; P.rl={x:0.85,z:1.1}; P.rideYaw=v.yaw; v.riders=v.riders||{}; v.riders[MP.id||'me']=1; if(MP.play)mpSend({t:'rider',i:v.idx,on:1});
@@ -1876,7 +1876,7 @@ function botCrewUpdate(b,dt){
   const v=b.crewOf;
   if(v.forPlayer){ b.crewT=(b.crewT||0)+dt; if(v.occupied)b.crewT=0; if(v.y>1&&!v.occupied){ crewOut(b,true); return; } if(!v.occupied&&b.crewT>25){ crewOut(b,false); return; } }
   else if(!v.bot||!v.bot.alive||v.bot.veh!==v){ crewOut(b,true); return; }
-  if(v.type==='heli'){ const c=Math.cos(v.yaw),sn=Math.sin(v.yaw),lx=-0.72,lz=b.cslot?1.85:0.55; b.x=v.x+(lx*c+lz*sn)*HS; b.z=v.z+(-lx*sn+lz*c)*HS; b.y=v.y+1.575; b.mesh.position.set(b.x,b.y,b.z); b.mesh.rotation.y=v.yaw; }
+  if(v.type==='heli'){ const c=Math.cos(v.yaw),sn=Math.sin(v.yaw),lx=0.8,lz=b.cslot?2.15:0.15; b.x=v.x+(lx*c+lz*sn)*HS; b.z=v.z+(-lx*sn+lz*c)*HS; b.y=v.y+1.725-0.3+0.05; b.mesh.position.set(b.x,b.y,b.z); b.mesh.rotation.y=v.yaw+Math.PI/2; }
   else{ b.x=v.x; b.y=v.y; b.z=v.z; }
   b.yaw=v.yaw; b.speedNow=0; b.vcd-=dt;
   if(b.vcd<=0&&state==='play'){ let tg=null,bd=45;
