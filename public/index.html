@@ -1217,6 +1217,24 @@ function explodeAt(x,y,z,owner,rad,dmg){
     damage(f,dmg*(1-d/rad),owner,false);
   }
 }
+const MS_MAX=6, MS_REGEN=12, MS={n:6,t:0,cd:0,nt:0}, msls=[];
+function fireMissile(){
+  const v=P.veh; MS.n--; MS.cd=1.3;
+  camera.updateMatrixWorld(); const co=new THREE.Vector3(),d0=new THREE.Vector3(); camera.getWorldPosition(co); camera.getWorldDirection(d0);
+  const rc=trace(co.x,co.y,co.z,d0.x,d0.y,d0.z,400,P.side); let at=Math.max(rc.t,25);
+  if(d0.y<-1e-4){ const tg=-co.y/d0.y; if(tg>0&&tg<at)at=tg; }
+  const Tx=co.x+d0.x*at,Ty=co.y+d0.y*at,Tz=co.z+d0.z*at;
+  const side=(MS.n%2?1:-1)*1.9, ox=v.x+Math.cos(v.yaw)*side-Math.sin(v.yaw)*2, oy=v.y+1.6, oz=v.z-Math.sin(v.yaw)*side-Math.cos(v.yaw)*2;
+  const dist=Math.hypot(Tx-ox,Ty-oy,Tz-oz), m=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,1.2,6),new THREE.MeshBasicMaterial({color:0xdddddd}));
+  const dir=new THREE.Vector3(Tx-ox,Ty-oy,Tz-oz).normalize(); m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir); m.position.set(ox,oy,oz); scene.add(m);
+  msls.push({m,x:ox,y:oy,z:oz,dx:dir.x,dy:dir.y,dz:dir.z,L:dist,t:0,tx:Tx,ty:Ty,tz:Tz,sp:85});
+  burst(ox,oy,oz,0xffffff,8,4); sndShot(0.8,150); recoil+=0.03;
+  if(MP.play)mpSend({t:'sh',ax:+ox.toFixed(2),ay:+oy.toFixed(2),az:+oz.toFixed(2),bx:+Tx.toFixed(2),by:+Ty.toFixed(2),bz:+Tz.toFixed(2),w:LOADOUT[cur].id,bm:0});
+}
+function missileUpdate(dt){
+  for(let i=msls.length-1;i>=0;i--){ const q=msls[i]; q.t+=dt*q.sp; q.x+=q.dx*dt*q.sp; q.y+=q.dy*dt*q.sp; q.z+=q.dz*dt*q.sp; q.m.position.set(q.x,q.y,q.z); if(Math.random()<0.7)burst(q.x,q.y,q.z,0xb0b0b0,1,0.8);
+    if(q.t>=q.L){ scene.remove(q.m); q.m.geometry.dispose(); q.m.material.dispose(); msls.splice(i,1); explodeAt(q.tx,q.ty,q.tz,P,11,230); if(MP.play)mpSend({t:'sh',ax:+q.tx.toFixed(2),ay:+q.ty.toFixed(2),az:+q.tz.toFixed(2),bx:+q.tx.toFixed(2),by:+q.ty.toFixed(2),bz:+q.tz.toFixed(2),w:LOADOUT[cur].id,bm:1}); } }
+}
 function vehShoot(){
   const v=P.veh, ty=v.type;
   camera.updateMatrixWorld();
@@ -1438,6 +1456,8 @@ function updatePlayer(dt){
     else startReload();
   }
   if(P.alive&&state==='play'&&P.veh&&ARMED[P.veh.type]){ if(mouseDown&&fireCd<=0)vehShoot(); }
+  MS.cd=Math.max(0,MS.cd-dt); if(MS.n<MS_MAX){ MS.t+=dt; if(MS.t>=MS_REGEN){ MS.t=0; MS.n++; } } else MS.t=0;
+  if(P.alive&&state==='play'&&P.veh&&P.veh.type==='heli'&&P.seat!==1&&(mouseR||keys.KeyX)&&MS.cd<=0){ if(MS.n>0)fireMissile(); else if(now-MS.nt>1.5){ MS.nt=now; toast('Füze yok — dolması uzun sürer ('+Math.ceil(MS_REGEN-MS.t)+' sn)',1400); } }
   // hasar rejenerasyonu
   if(P.alive){ if(!MP.play){ if(regenT>0)regenT-=dt; else if(P.hp<P.maxHp)P.hp=Math.min(P.maxHp,P.hp+18*dt); } }
   else if((mode==='tdm'||(mode==='br'&&BR.dm))&&!MP.play){ P.respT-=dt; $('deadsub').textContent=($('deadsub').textContent.split(' | ')[0])+' | '+Math.max(0,Math.ceil(P.respT))+' sn'; if(P.respT<=0&&state==='play'){ respawn(P); $('dead').style.display='none'; } }
@@ -2441,7 +2461,7 @@ const VCFG={car:{acc:17,brake:38,max:31,rev:9,turn:1.75,r:1.5,h:1.8,wr:0.42},bik
 const VCAM={car:{d:7.5,h:1.6,look:0.4},bike:{d:5.5,h:1.4,look:0.5},heli:{d:21,h:3.6,look:1.2},plane:{d:15,h:2.4,look:1},jeep:{d:8.5,h:2.2,look:1},tank:{d:12,h:3.4,look:1}};
 const VDIM={car:[1.0,2.1,1.9],bike:[0.45,1.1,1.2],heli:[2.3,5.1,4.8],plane:[4.6,3.8,2.6],jeep:[1.1,2.3,2.0],tank:[1.9,3.3,2.7]};
 const VHELP={jeep:'W/S gaz-fren, A/D direksiyon, Boşluk el freni. Sol tık: makineli tüfek (fareyle nişan). Yanına bir arkadaşın yolcu/nişancı olarak binebilir. E ile in',tank:'W/S ileri-geri, A/D dön, Boşluk fren. Sol tık: top (patlayıcı mermi), fareyle namlu yönü. Çarptığını ezer. E ile in',car:'W/S gaz-fren, A/D direksiyon, Boşluk el freni, E ile in',bike:'W/S gaz-fren, A/D direksiyon, Boşluk fren, E ile in',
-  heli:'W/S ileri-geri, A/D dön, Boşluk yüksel, Shift alçal. Sol tık: ateş. Yerdeyken E ile in, havadayken E ile paraşütle atla',plane:'W/S gaz, A/D dön, Boşluk burun yukarı, Shift burun aşağı. Sol tık: ateş. Hız 24 üstünde havalanır. Yerdeyken E ile in, havadayken E ile paraşütle atla'};
+  heli:'W/S ileri-geri, A/D dön, Boşluk yüksel, Shift alçal. Sol tık: ateş, Sağ tık ya da X: füze (6 adet, her biri 12 sn içinde dolar). Yerdeyken E ile in, havadayken E ile paraşütle atla',plane:'W/S gaz, A/D dön, Boşluk burun yukarı, Shift burun aşağı. Sol tık: ateş. Hız 24 üstünde havalanır. Yerdeyken E ile in, havadayken E ile paraşütle atla'};
 function buildVehicleMesh(type){
   const bx=(w,h,d,x,y,z,col,rx,ry,rz)=>bake(new THREE.BoxGeometry(w,h,d),x,y,z,rx||0,ry||0,rz||0,1,1,1,col);
   const cy=(rt,rb,h,x,y,z,rx,ry,rz,col,sg)=>bake(new THREE.CylinderGeometry(rt,rb,h,sg||12,1),x,y,z,rx||0,ry||0,rz||0,1,1,1,col);
@@ -2680,7 +2700,7 @@ function driveVehicle(v,dt){
   else{ if(v.type==='heli')driveHeli(v,dt); else if(v.type==='plane')drivePlane(v,dt); else driveGround(v,dt); animVeh(v,dt); placeVeh(v); }
   P.x=v.x; P.z=v.z; P.y=v.y+0.2; P.vx=P.vz=0;
   const kmh=Math.round(Math.abs(v.speed)*3.6); const alt=Math.round(v.y);
-  const vi=VNAME[v.type]+'<small>'+kmh+' km/s'+((v.type==='heli'||v.type==='plane')?'   İrtifa '+alt+' m':'')+'</small>'; if(hudCache.vi!==vi){ hudCache.vi=vi; $('vinfo').innerHTML=vi; }
+  const vi=VNAME[v.type]+'<small>'+kmh+' km/s'+((v.type==='heli'||v.type==='plane')?'   İrtifa '+alt+' m':'')+(v.type==='heli'?'   Füze '+MS.n+'/'+MS_MAX+(MS.n<MS_MAX?' ('+Math.ceil(MS_REGEN-MS.t)+' sn)':'')+' [sağ tık/X]':'')+'</small>'; if(hudCache.vi!==vi){ hudCache.vi=vi; $('vinfo').innerHTML=vi; }
 }
 function animVeh(v,dt){
   const p=v.parts;
@@ -2794,6 +2814,7 @@ function updateProjs(dt){
     p.x=nx; p.y=ny; p.z=nz; p.mesh.position.set(nx,ny,nz); p.mesh.rotation.x+=dt*8; p.fuse-=dt;
     if(p.fuse<=0){ if(p.type==='frag'||p.type==='c4')explode(p); else{ makeSmoke(p.x,Math.max(0,p.y-0.1),p.z); sndTone(160,0.2,0.05); } scene.remove(p.mesh); p.mesh.geometry.dispose(); projs.splice(i,1); }
   }
+  missileUpdate(dt);
   for(let i=booms.length-1;i>=0;i--){ const b=booms[i]; b.t+=dt; const k=b.t/0.28; b.m.scale.setScalar(0.5+k*5.5); b.m.material.opacity=0.8*(1-k); if(k>=1){ scene.remove(b.m); b.m.geometry.dispose(); b.m.material.dispose(); booms.splice(i,1); } }
   for(let i=SMOKES.length-1;i>=0;i--){
     const s=SMOKES[i]; s.t+=dt; s.r=Math.min(5.6,s.t*3.4); const fade=Math.min(1,(s.life-s.t)/3); s.mat.opacity=Math.min(0.62,s.t*0.5)*Math.max(0,fade);

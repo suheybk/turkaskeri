@@ -174,3 +174,8 @@ yalnızca DoS'u kesiyor, hileyi kesmiyor.
 - Sınır: online tarafta oturma pozu iki tarayıcıyla görsel olarak doğrulanmadı.
 - Bot yolcular artık bank koltuklarına kabinin içine bakacak şekilde oturur; oyuncu dolu koltuğa oturamaz, boş olana (ya da sedyeye) oturur.
 - Düzeltme: koltuktan kalkınca oyuncu kabinde serbest bir noktaya alınır, yürümeye devam eder.
+
+## Helikopter füzesi
+- Pilot **sağ tık ya da X** ile füze atar: 6 füze, her biri 12 sn'de dolar (tamamı ~72 sn), atışlar arası 1,3 sn. HUD'da "Füze n/6 (kalan sn)".
+- Füze görünür uçar (85 m/sn), hedefe varınca patlar (11 m yarıçap, 230 hasar). Çok oyunculuda patlama diğer oyunculara tracer+patlama olarak yayınlanır.
+- Sınır: füze isabeti/hasarı hedefi vuran oyuncu tarafında hesaplanır; uçuş görseli ve patlama gerçek ağda test edilmedi.
