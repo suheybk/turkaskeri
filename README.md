@@ -159,3 +159,8 @@ yalnızca DoS'u kesiyor, hileyi kesmiyor.
 - Black Hawk artık içi boş: gri zemin, zeytin yeşili sedye/ranza ve oturaklar (BR, Rush, Conquest'te aynı model).
 - Helikopterde E ile bin, içeride yürü, kapıdan E ile in; uçuşta da yürünebilir. Bot pilot uçarken kendi silahınla ateş edebilirsin.
 - Sınır: mermiler duvarlardan geçer; çok oyunculu binme/yürüme senkronu gerçek ağda test edilmedi.
+
+## Helikopterde oturma + Rush haritası ~6× büyük
+- Helikopter içinde bank/sedye yanına gidip **E: Otur** (4 koltuk); WASD ya da E ile kalkılır. Otururken kendi silahınla ateş edebilirsin.
+- Rush haritaları (Geniş Vadi, Büyük Liman) 340×340'tan 830×830'a çıktı (~6× alan); bayraklar/M-COM'lar ölçeklendi, bina sayısı ve araç sayısı artırıldı.
+- Sınır: gerçek cihazda performans ve çok oyunculu oturma senkronu test edilmedi.
