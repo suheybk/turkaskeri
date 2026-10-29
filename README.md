@@ -173,3 +173,4 @@ yalnızca DoS'u kesiyor, hileyi kesmiyor.
 - Helikoptere binen bot ekip arkadaşları artık gizlenmiyor: kabinde sedyelerde oturur pozda görünür (online oyunculara da oturur olarak yayınlanır).
 - Sınır: online tarafta oturma pozu iki tarayıcıyla görsel olarak doğrulanmadı.
 - Bot yolcular artık bank koltuklarına kabinin içine bakacak şekilde oturur; oyuncu dolu koltuğa oturamaz, boş olana (ya da sedyeye) oturur.
+- Düzeltme: koltuktan kalkınca oyuncu kabinde serbest bir noktaya alınır, yürümeye devam eder.

@@ -1837,6 +1837,7 @@ function ruUpdate(dt){
 const HS=1.5, RIDE_OBS=[[0.62,0.95,-0.2,0.5],[0.62,0.95,1.7,2.6]];
 function rideOK(x,z,v){ if(z<-0.05||z>2.5)return false; const door=z>0.55&&z<1.65, xmax=door?(v.y<1.5?1.4:0.95):0.9; if(x<-0.38||x>xmax)return false; for(const o of RIDE_OBS)if(x>o[0]&&x<o[1]&&z>o[2]&&z<o[3])return false; return true; }
 const RIDE_SEATS=[[0.8,0.15],[0.8,2.15],[-0.72,0.55],[-0.72,1.85]];
+function rideStand(){ P.sit=null; const l=P.rl; if(l.x>0.5)l.x=0.5; else if(l.x<-0.3)l.x=-0.3; }
 function rideSeat(){ let b=null,bd=0.9; for(const q of RIDE_SEATS){ if(P.ride&&fighters.some(f=>f.crewOf===P.ride&&f.cslot!==undefined&&Math.abs((f.cslot?2.15:0.15)-q[1])<0.1&&q[0]>0))continue; const d=Math.hypot(P.rl.x-q[0],P.rl.z-q[1]); if(d<bd){bd=d;b=q;} } return b; }
 function rideWorld(v){ const c=Math.cos(v.yaw),sn=Math.sin(v.yaw),l=P.rl; return [v.x+(l.x*c+l.z*sn)*HS, v.y+(0.85-(P.sit?0.3:0))*HS, v.z+(-l.x*sn+l.z*c)*HS]; }
 function rideEnter(v){
@@ -1852,7 +1853,7 @@ function rideUpdate(dt){
   const v=P.ride; if(!v.occupied||(!v.bot&&!v.botV&&!v.driver)){ rideLeave(true); return; }
   P.yaw+=wrapA(v.yaw-P.rideYaw); P.rideYaw=v.yaw;
   const ix=(keys.KeyD?1:0)-(keys.KeyA?1:0), iz=(keys.KeyW?1:0)-(keys.KeyS?1:0), il=Math.hypot(ix,iz)||1, sp=3.4*(adsK>0.5?0.6:1);
-  if(P.sit){ if(ix||iz){ P.sit=null; } else { const q=rideWorld(v); P.x=q[0]; P.y=q[1]; P.z=q[2]; P.vx=P.vz=0; P.vy=0; P.sprint=false; return; } }
+  if(P.sit){ if(ix||iz){ rideStand(); } else { const q=rideWorld(v); P.x=q[0]; P.y=q[1]; P.z=q[2]; P.vx=P.vz=0; P.vy=0; P.sprint=false; return; } }
   const fx=-Math.sin(P.yaw),fz=-Math.cos(P.yaw),rx=Math.cos(P.yaw),rz=-Math.sin(P.yaw);
   const wx=(fx*iz+rx*ix)/il*sp, wz=(fz*iz+rz*ix)/il*sp, c=Math.cos(v.yaw), sn=Math.sin(v.yaw);
   const nx=P.rl.x+(wx*c-wz*sn)*dt/HS, nz=P.rl.z+(wx*sn+wz*c)*dt/HS;
@@ -2612,7 +2613,7 @@ function bailOut(){
 function interact(){
   if(RU.on&&mode==='tdm')RU.touchT=now+0.5;
   if(!P.alive||P.air||state!=='play'||(mode!=='br'&&!CQV.on))return;
-  if(P.ride){ if(P.sit){ P.sit=null; return; } const sq=rideSeat(); if(sq){ P.sit=sq; P.rl={x:sq[0],z:sq[1]}; toast('Oturdun. Kalkmak için WASD ya da E',1800); return; } rideLeave(); return; }
+  if(P.ride){ if(P.sit){ rideStand(); return; } const sq=rideSeat(); if(sq){ P.sit=sq; P.rl={x:sq[0],z:sq[1]}; toast('Oturdun. Kalkmak için WASD ya da E',1800); return; } rideLeave(); return; }
   if(P.veh){ const v=P.veh; if((v.type==='heli'||v.type==='plane')&&v.y>2.8){ bailOut(); return; } leaveVehicle(); return; }
   if(BR.nearRide){ rideEnter(BR.nearRide); return; }
   if(BR.nearItem){ const it=BR.nearItem;
