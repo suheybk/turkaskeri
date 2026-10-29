@@ -168,3 +168,7 @@ yalnızca DoS'u kesiyor, hileyi kesmiyor.
 ## Online arkadaşla helikopterin arkasına binme
 - Takım arkadaşın helikopteri pilot olarak kullanırken yere inmişken yanına gidip **E: Arkadaşının helikopterine arkadan bin**; kabinde yürü/otur, kendi silahınla ateş et (en fazla 2 yolcu). Rush/Conquest'te sadece kendi takımının helikopterine, Battle Royale'de herhangi birine.
 - 2 tarayıcılı testte: pilot binişi, yolcunun kabine girmesi ve havalanınca kabinde kalması doğrulandı. Sınır: gerçek ağ gecikmesinde ve iki yolcuyla denenmedi.
+
+## Helikopterdeki bot yolcular görünür
+- Helikoptere binen bot ekip arkadaşları artık gizlenmiyor: kabinde sedyelerde oturur pozda görünür (online oyunculara da oturur olarak yayınlanır).
+- Sınır: online tarafta oturma pozu iki tarayıcıyla görsel olarak doğrulanmadı.

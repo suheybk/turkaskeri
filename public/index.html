@@ -1868,15 +1868,17 @@ function botVehFind(b){
     if(!crew&&(v.occupied||v.bot||(v.type==='heli'&&v.y>1)))continue;
     const d=Math.hypot(v.x-b.x,v.z-b.z)-(v.type==='heli'?14:0); if(d<bd){bd=d;best=v;} } return best;
 }
-function botCrewIn(b,v){ v.crew=(v.crew||0)+1; b.crewOf=v; b.wantV=null; b.path=null; b.target=null; b.seeing=false; b.mesh.visible=false; b.vcd=1; }
+function botCrewIn(b,v){ v.crew=(v.crew||0)+1; b.crewOf=v; b.wantV=null; b.path=null; b.target=null; b.seeing=false; b.vcd=1; if(v.type==='heli'){ const used=fighters.filter(f=>f!==b&&f.crewOf===v).map(f=>f.cslot); b.cslot=used.includes(0)?1:0; b.mesh.visible=true; sitFig(b.fig,true); } else b.mesh.visible=false; }
 function crewOut(b,force){
-  const v=b.crewOf; if(!v)return; b.crewOf=null; v.crew=Math.max(0,(v.crew||0)-1); b.mesh.visible=true; b.path=null; b.pathAt=0; b.cd=0.6; b.x=v.x+Math.cos(b.id*1.7||1)*2.6; b.z=v.z+Math.sin(b.id*1.7||1)*2.6; b.y=force?0:0; if(blockedAt(b.x,b.z,0.5,0)){ b.x=v.x; b.z=v.z; }
+  const v=b.crewOf; if(!v)return; b.crewOf=null; v.crew=Math.max(0,(v.crew||0)-1); b.mesh.visible=true; if(v.type==='heli'){ sitFig(b.fig,false); b.mesh.position.y=0; } b.path=null; b.pathAt=0; b.cd=0.6; b.x=v.x+Math.cos(b.id*1.7||1)*2.6; b.z=v.z+Math.sin(b.id*1.7||1)*2.6; b.y=force?0:0; if(blockedAt(b.x,b.z,0.5,0)){ b.x=v.x; b.z=v.z; }
 }
 function botCrewUpdate(b,dt){
   const v=b.crewOf;
   if(v.forPlayer){ b.crewT=(b.crewT||0)+dt; if(v.occupied)b.crewT=0; if(v.y>1&&!v.occupied){ crewOut(b,true); return; } if(!v.occupied&&b.crewT>25){ crewOut(b,false); return; } }
   else if(!v.bot||!v.bot.alive||v.bot.veh!==v){ crewOut(b,true); return; }
-  b.x=v.x; b.y=v.y; b.z=v.z; b.yaw=v.yaw; b.speedNow=0; b.vcd-=dt;
+  if(v.type==='heli'){ const c=Math.cos(v.yaw),sn=Math.sin(v.yaw),lx=-0.72,lz=b.cslot?1.85:0.55; b.x=v.x+(lx*c+lz*sn)*HS; b.z=v.z+(-lx*sn+lz*c)*HS; b.y=v.y+1.575; b.mesh.position.set(b.x,b.y,b.z); b.mesh.rotation.y=v.yaw; }
+  else{ b.x=v.x; b.y=v.y; b.z=v.z; }
+  b.yaw=v.yaw; b.speedNow=0; b.vcd-=dt;
   if(b.vcd<=0&&state==='play'){ let tg=null,bd=45;
     for(const f of fighters){ if(!f.alive||f.team===b.team||f.air)continue; const d=Math.hypot(f.x-v.x,f.z-v.z); if(d<bd&&canSee(v.x,v.y+1.5,v.z,f.x,f.y+1,f.z)){ bd=d; tg=f; } }
     if(tg){ b.vcd=0.35; const hit=Math.random()<0.3, tx=tg.x+(hit?0:rnd(-2,2)), tz=tg.z+(hit?0:rnd(-2,2)), ty=tg.y+1.2;
@@ -3178,7 +3180,7 @@ function updateRemote(f,dt){
   if(!f.alive){ if(f.deadK<1){ f.deadK=Math.min(1,f.deadK+dt*3); f.mesh.rotation.x=f.deadK*1.5; } if(f.canopy)f.canopy.visible=false; return; }
   if(f.fresh){ f.mesh.visible=false; return; }
   const k=Math.min(1,dt*12); f.x+=(f.tx-f.x)*k; f.y+=(f.ty-f.y)*k; f.z+=(f.tz-f.z)*k; f.yaw+=wrapA(f.tyaw-f.yaw)*k;
-  { const ts=[1,0.76,0.42][f.stance|0]; f.mesh.scale.y+=(ts-f.mesh.scale.y)*Math.min(1,dt*10); } f.mesh.visible=!f.iv; if(f.canopy)f.canopy.visible=!!f.air&&f.y<46; f.animT+=dt*f.spd*1.9; animFig(f.fig,f.animT,f.air?0:Math.min(1,f.spd/4.5)); f.mesh.position.set(f.x,f.y,f.z); f.mesh.rotation.y=f.yaw;
+  { const ts=[1,0.76,0.42][f.stance|0]; f.mesh.scale.y+=(ts-f.mesh.scale.y)*Math.min(1,dt*10); } f.mesh.visible=!f.iv; if(f.canopy)f.canopy.visible=!!f.air&&f.y<46; f.animT+=dt*f.spd*1.9; if(!f.sitH)animFig(f.fig,f.animT,f.air?0:Math.min(1,f.spd/4.5)); f.mesh.position.set(f.x,f.y,f.z); f.mesh.rotation.y=f.yaw;
 }
 function becomeHost(){
   let n=0;
@@ -3283,7 +3285,7 @@ function mpMsg(m){
     case 'voteend': hideVote(); if(!m.ok){ if(!MP.play){ $('lbWait').textContent=(m.msg||'Teklif kabul edilmedi.')+(m.rej?' (Ret: '+m.rej+', Kabul: '+m.acc+')':''); toast(m.msg||'Teklif kabul edilmedi.',3000); } } break;
     case 'start': MP.phase='play'; MP.mode=m.mode; MP.dom=m.dom|0; MP.seed=m.seed; MP.score=m.score; MP.left=m.left; fillPlayers(m.ents); MP.spec=false; startMP(); break;
     case 'st': { if(!MP.play)break; const pl=MP.players[m.id]; if(!pl||!pl.f)break; const f=pl.f; f.tx=m.x; f.ty=m.y; f.tz=m.z; f.tyaw=m.yaw; f.spd=m.s; f.air=!!(m.a||m.iv); f.iv=!!m.iv; f.stance=m.sn|0; if(f.fresh){ f.x=m.x; f.y=m.y; f.z=m.z; f.yaw=m.yaw; f.fresh=false; } setRemoteWeapon(f,m.w); break; }
-    case 'bs': { if(!MP.play||MP.host===MP.id)break; for(const q of m.b){ const pl=MP.players[q[0]]; if(!pl||!pl.f||!pl.f.remote)continue; const f=pl.f; f.tx=q[1]; f.ty=q[2]; f.tz=q[3]; f.tyaw=q[4]; f.spd=q[5]; f.air=!!q[6]; f.iv=!!q[8]; if(f.fresh){ f.x=q[1]; f.y=q[2]; f.z=q[3]; f.yaw=q[4]; f.fresh=false; } setRemoteWeapon(f,q[7]); }
+    case 'bs': { if(!MP.play||MP.host===MP.id)break; for(const q of m.b){ const pl=MP.players[q[0]]; if(!pl||!pl.f||!pl.f.remote)continue; const f=pl.f; f.tx=q[1]; f.ty=q[2]; f.tz=q[3]; f.tyaw=q[4]; f.spd=q[5]; f.air=!!q[6]; f.iv=!!q[8]; if(!!q[9]!==!!f.sitH){ f.sitH=!!q[9]; sitFig(f.fig,f.sitH); } if(f.fresh){ f.x=q[1]; f.y=q[2]; f.z=q[3]; f.yaw=q[4]; f.fresh=false; } setRemoteWeapon(f,q[7]); }
       if(CQV.on||mode==='br'){ const seen={}; for(const q of (m.v||[])){ const v=BR.vehicles[q[0]]; if(!v)continue; seen[q[0]]=1; v.occupied=true; v.driver=q[5]; v.tgt={x:q[1],y:q[2],z:q[3],yaw:q[4]}; v.botV=1; showDriver(v,true); syncVehBox(v); }
         for(const v of BR.vehicles)if(v.botV&&!seen[v.idx]){ v.botV=0; v.occupied=false; v.driver=0; v.tgt=null; showDriver(v,false); syncVehBox(v); } }
       break; }
@@ -3416,7 +3418,7 @@ function frame(t){
     if(MP.play){
       MP.sendT-=dt; if(MP.sendT<=0){ MP.sendT=0.066; if(P.alive)mpSend({t:'st',x:+P.x.toFixed(2),y:+P.y.toFixed(2),z:+P.z.toFixed(2),yaw:+P.yaw.toFixed(3),w:LOADOUT[cur].id,s:+Math.hypot(P.vx,P.vz).toFixed(2),a:P.air?1:0,iv:P.veh?1:0,sn:P.st||0}); }
       if(P.veh){ MP.vstT-=dt; if(MP.vstT<=0){ MP.vstT=0.066; const v=P.veh; if(P.seat===1)mpSend({t:'vst',i:v.idx,g:1,ty:+(v.ty||0).toFixed(3)}); else mpSend({t:'vst',i:v.idx,ty:+(v.ty||0).toFixed(3),x:+v.x.toFixed(2),y:+v.y.toFixed(2),z:+v.z.toFixed(2),yaw:+v.yaw.toFixed(3),pv:+(v.pitchV||0).toFixed(3),roll:+(v.roll||0).toFixed(3),spd:+v.speed.toFixed(2),rot:+(v.rotor||0).toFixed(2),thr:+(v.thr||0).toFixed(2)}); } }
-      if(MP.host===MP.id){ MP.bsT-=dt; if(MP.bsT<=0){ MP.bsT=0.08; const b=[]; for(const f of fighters) if(f.bot&&!f.remote&&f.alive) b.push([f.id,+f.x.toFixed(2),+f.y.toFixed(2),+f.z.toFixed(2),+f.yaw.toFixed(3),+(f.speedNow||0).toFixed(1),f.air?1:0,f.wp.id,(f.veh||f.crewOf)?1:0]); const vs=(CQV.on||mode==='br')?BR.vehicles.filter(v=>v.bot&&v.bot.alive).map(v=>[v.idx,+v.x.toFixed(2),+v.y.toFixed(2),+v.z.toFixed(2),+v.yaw.toFixed(3),v.bot.id]):[]; if(b.length)mpSend({t:'bs',b,v:vs}); } }
+      if(MP.host===MP.id){ MP.bsT-=dt; if(MP.bsT<=0){ MP.bsT=0.08; const b=[]; for(const f of fighters) if(f.bot&&!f.remote&&f.alive) b.push([f.id,+f.x.toFixed(2),+f.y.toFixed(2),+f.z.toFixed(2),+f.yaw.toFixed(3),+(f.speedNow||0).toFixed(1),f.air?1:0,f.wp.id,(f.veh||(f.crewOf&&f.crewOf.type!=='heli'))?1:0,(f.crewOf&&f.crewOf.type==='heli')?1:0]); const vs=(CQV.on||mode==='br')?BR.vehicles.filter(v=>v.bot&&v.bot.alive).map(v=>[v.idx,+v.x.toFixed(2),+v.y.toFixed(2),+v.z.toFixed(2),+v.yaw.toFixed(3),v.bot.id]):[]; if(b.length)mpSend({t:'bs',b,v:vs}); } }
     }
     P.firedT=Math.max(0,P.firedT-dt);
     if(mode==='br')updateBR(dt);
