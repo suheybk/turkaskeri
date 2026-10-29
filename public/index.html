@@ -2713,8 +2713,8 @@ function updateNear(dt){
   if(P.alive&&!P.air&&!P.veh&&!P.ride){
     let bd=2.4; for(const it of ITS){ if(!it.alive)continue; const d=Math.hypot(it.x-P.x,it.z-P.z); if(d<bd&&Math.abs(P.y-(it.y||0))<3.2){ bd=d; BR.nearItem=it; } }
     if(BR.nearItem) txt='E: Al - '+itemName(BR.nearItem);
-    else{ let bv=1e9; for(const v of BR.vehicles){ if((v.bot||v.botV)&&v.type==='heli'&&v.y<1.5&&(mode==='br'||(v.home.z>0?'a':'o')===P.team)&&Object.values(v.riders||{}).filter(Boolean).length<2){ if(Math.hypot(v.x-P.x,v.z-P.z)<VRANGE.heli+1.5)BR.nearRide=v; continue; } if(v.bot||v.botV)continue; if(v.occupied&&!(MP.play&&v.type==='jeep'&&v.driver&&!v.pass))continue; const d=Math.hypot(v.x-P.x,v.z-P.z); if(d<VRANGE[v.type]&&d<bv&&Math.abs(v.y-P.y)<3){ bv=d; BR.nearVeh=v; } }
-      if(BR.nearRide&&!BR.nearVeh) txt='E: Helikoptere bin (içinde yürüyebilirsin)';
+    else{ let bv=1e9; for(const v of BR.vehicles){ if((v.bot||v.botV||(MP.play&&v.occupied&&v.driver&&v.driver!==MP.id&&!v.pass))&&v.type==='heli'&&v.y<1.5&&(mode==='br'||(v.home.z>0?'a':'o')===P.team)&&Object.values(v.riders||{}).filter(Boolean).length<2){ if(Math.hypot(v.x-P.x,v.z-P.z)<VRANGE.heli+1.5)BR.nearRide=v; continue; } if(v.bot||v.botV)continue; if(v.occupied&&!(MP.play&&v.type==='jeep'&&v.driver&&!v.pass))continue; const d=Math.hypot(v.x-P.x,v.z-P.z); if(d<VRANGE[v.type]&&d<bv&&Math.abs(v.y-P.y)<3){ bv=d; BR.nearVeh=v; } }
+      if(BR.nearRide&&!BR.nearVeh) txt=(BR.nearRide.bot||BR.nearRide.botV)?'E: Helikoptere bin (içinde yürüyebilirsin)':'E: Arkadaşının helikopterine arkadan bin';
       else if(BR.nearVeh) txt=BR.nearVeh.occupied?'E: Yolcu olarak bin - '+VNAME[BR.nearVeh.type]:'E: Araca bin - '+VNAME[BR.nearVeh.type]; }
   } else if(P.alive&&P.ride){ txt=P.sit?'E: Kalk':rideSeat()?'E: Otur':P.ride.y>2.8?'E: Helikopterden atla':'E: Helikopterden in'; }
   else if(P.alive&&P.veh){ const v=P.veh; txt=((v.type==='heli'||v.type==='plane')&&v.y>2.8)?'E: Paraşütle atla (ya da alçalıp in)':'E: Araçtan in'; }

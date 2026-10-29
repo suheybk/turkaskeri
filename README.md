@@ -164,3 +164,7 @@ yalnızca DoS'u kesiyor, hileyi kesmiyor.
 - Helikopter içinde bank/sedye yanına gidip **E: Otur** (4 koltuk); WASD ya da E ile kalkılır. Otururken kendi silahınla ateş edebilirsin.
 - Rush haritaları (Geniş Vadi, Büyük Liman) 340×340'tan 830×830'a çıktı (~6× alan); bayraklar/M-COM'lar ölçeklendi, bina sayısı ve araç sayısı artırıldı.
 - Sınır: gerçek cihazda performans ve çok oyunculu oturma senkronu test edilmedi.
+
+## Online arkadaşla helikopterin arkasına binme
+- Takım arkadaşın helikopteri pilot olarak kullanırken yere inmişken yanına gidip **E: Arkadaşının helikopterine arkadan bin**; kabinde yürü/otur, kendi silahınla ateş et (en fazla 2 yolcu). Rush/Conquest'te sadece kendi takımının helikopterine, Battle Royale'de herhangi birine.
+- 2 tarayıcılı testte: pilot binişi, yolcunun kabine girmesi ve havalanınca kabinde kalması doğrulandı. Sınır: gerçek ağ gecikmesinde ve iki yolcuyla denenmedi.
